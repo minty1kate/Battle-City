@@ -67,6 +67,8 @@ class Game:
                 sys.exit()
 
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p and self.state in ("playing", "paused"):
+                    self.state = "paused" if self.state == "playing" else "playing"
                 if self.state == "menu" and event.key == pygame.K_RETURN:
                     self.state = "playing"
                 elif self.state == "playing" and event.key in LEVEL_KEYS:
@@ -198,6 +200,11 @@ class Game:
             pygame.draw.rect(self.screen, BLACK, box.inflate(24, 12))
             self.draw_text_center(self.font_big, text, color, HEIGHT // 2)
             self.draw_text_center(self.font_ui, "R - играть заново", WHITE, HEIGHT // 2 + 50)
+
+        if self.state == "paused":
+            box = self.font_big.render("ПАУЗА", True, WHITE).get_rect(center=(WIDTH // 2, HEIGHT // 2))
+            pygame.draw.rect(self.screen, BLACK, box.inflate(24, 12))
+            self.draw_text_center(self.font_big, "ПАУЗА", WHITE, HEIGHT // 2)
 
     def draw(self):
         """Очитска экрана и вызов рендеров"""
