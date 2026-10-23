@@ -2,6 +2,7 @@
 import sys
 
 import pygame
+import json
 from src.settings import *
 from src.levels import LEVELS
 from src.sprites import Block, PlayerTank, EnemyTank, Bonus, ENEMY_STATS
@@ -69,11 +70,23 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if self.state == "menu" and event.key == pygame.K_RETURN:
                     self.state = "playing"
-                elif self.state == "playing" and event.key in LEVEL_KEYS:
-                    self.load_level(LEVEL_KEYS[event.key])
+
                 elif self.state in ("game_over", "win") and event.key == pygame.K_r:
                     self.start_new_game()
                     self.state = "playing"
+
+                elif self.state in ("playing", "paused"):
+                    if event.key == pygame.K_p:
+                        self.state = "paused" if self.state == "playing" else "playing"
+
+                    elif event.key in LEVEL_KEYS:
+                        self.load_level(LEVEL_KEYS[event.key])
+
+                    elif event.key == pygame.K_F5:
+                        self.save_game()
+
+                    elif event.key == pygame.K_F9:
+                        self.load_game()
 
     def spawn_enemy(self):
         """Создаёт врага, если на карте есть место"""
@@ -198,6 +211,41 @@ class Game:
             pygame.draw.rect(self.screen, BLACK, box.inflate(24, 12))
             self.draw_text_center(self.font_big, text, color, HEIGHT // 2)
             self.draw_text_center(self.font_ui, "R - играть заново", WHITE, HEIGHT // 2 + 50)
+
+        if self.state == "paused":
+            box = self.font_big.render("ПАУЗА", True, WHITE).get_rect(center=(WIDTH // 2, HEIGHT // 2))
+            pygame.draw.rect(self.screen, BLACK, box.inflate(24, 12))
+            self.draw_text_center(self.font_big, "ПАУЗА", WHITE, HEIGHT // 2)
+
+
+    def save_game(self):
+        """Сохранение прогресса"""
+        data = {
+            "level": self.level_idx,
+            "score": self.player.score,
+            "lives": self.player.lives,
+            "stars": self.player.stars,
+            "enemies_killed": self.enemies_killed
+        }
+        with open("save.json", "w") as file:
+            json.dump(data, file)
+        print("Игра сохранена!")
+
+    def load_game(self):
+        """Загрузка прогресса"""
+        try:
+            with open("save.json", "r") as file:
+                data = json.load(file)
+            self.load_level(data["level"])
+            self.player.score = data["score"]
+            self.player.lives = data["lives"]
+            self.player.stars = data["stars"]
+            self.enemies_killed = data["enemies_killed"]
+
+            self.state = "playing"
+            print("Игра загружена!")
+        except FileNotFoundError:
+            print("Файл сохранения не найден :(")
 
     def draw(self):
         """Очитска экрана и вызов рендеров"""
