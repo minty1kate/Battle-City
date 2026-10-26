@@ -9,7 +9,7 @@ import pygame
 import pytest
 
 from src.game import Game
-from src.settings import TILE_BASE
+from src.settings import TileType, GameState
 
 
 class FakeKeys:
@@ -67,7 +67,7 @@ def game(monkeypatch):
     pygame.key.get_pressed = lambda: FakeKeys()
 
     g = Game()
-    g.state = "playing"
+    g.state = GameState.PLAYING
     g.level_title_timer = 0
 
     yield g
@@ -80,7 +80,7 @@ def game(monkeypatch):
 def bare_game(game):
     """Игра на карте только с базой"""
     for block in list(game.all_blocks):
-        if block.type != TILE_BASE:
+        if block.type != TileType.BASE:
             block.kill()
 
     return game
