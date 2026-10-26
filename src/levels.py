@@ -1,4 +1,4 @@
-﻿from src.settings import *
+﻿from src.settings import GRID_SIZE, TileType
 
 
 def get_empty_matrix():
@@ -9,21 +9,21 @@ def get_empty_matrix():
 def add_base(matrix):
     """Генерация базы и кирпичей вокруг"""
     for col in range(11, 15):
-        matrix[23][col] = TILE_BRICK
-    matrix[24][11] = TILE_BRICK
-    matrix[24][14] = TILE_BRICK
-    matrix[24][12] = TILE_BASE
-    matrix[24][13] = TILE_BASE
+        matrix[23][col] = TileType.BRICK
+    matrix[24][11] = TileType.BRICK
+    matrix[24][14] = TileType.BRICK
+    matrix[24][12] = TileType.BASE
+    matrix[24][13] = TileType.BASE
 
 
 def add_border(matrix):
     """Создание невидимой рамки по краю карты"""
     last = GRID_SIZE - 1
     for i in range(GRID_SIZE):
-        matrix[0][i] = TILE_BORDER
-        matrix[last][i] = TILE_BORDER
-        matrix[i][0] = TILE_BORDER
-        matrix[i][last] = TILE_BORDER
+        matrix[0][i] = TileType.BORDER
+        matrix[last][i] = TileType.BORDER
+        matrix[i][0] = TileType.BORDER
+        matrix[i][last] = TileType.BORDER
 
 
 def finish_level(matrix):
@@ -36,13 +36,13 @@ lvl1 = get_empty_matrix()
 for i in range(2, 22, 4):
     for j in range(2, 24):
         if j % 5 != 0:
-            lvl1[j][i] = TILE_BRICK
+            lvl1[j][i] = TileType.BRICK
 finish_level(lvl1)
 
 lvl2 = get_empty_matrix()
 for i in range(1, 25):
-    lvl2[11][i] = TILE_WATER
-    lvl2[12][i] = TILE_WATER
+    lvl2[11][i] = TileType.WATER
+    lvl2[12][i] = TileType.WATER
 
 for x in [5, 6, 19, 20]:
     lvl2[11][x] = 0
@@ -51,35 +51,35 @@ for x in [5, 6, 19, 20]:
 for i in [4, 9, 16, 21]:
     for j in range(2, 23):
         if j not in [10, 11, 12, 13]:
-            lvl2[j][i] = TILE_CONCRETE if j % 4 == 0 else TILE_BRICK
+            lvl2[j][i] = TileType.CONCRETE if j % 4 == 0 else TileType.BRICK
 finish_level(lvl2)
 
 lvl3 = get_empty_matrix()
 for j in range(6, 20):
     for i in range(5, 21):
-        lvl3[j][i] = TILE_ICE
+        lvl3[j][i] = TileType.ICE
 
 for j in range(2, 24):
-    lvl3[j][2] = TILE_BUSH
-    lvl3[j][3] = TILE_BUSH
-    lvl3[j][22] = TILE_BUSH
-    lvl3[j][23] = TILE_BUSH
+    lvl3[j][2] = TileType.BUSH
+    lvl3[j][3] = TileType.BUSH
+    lvl3[j][22] = TileType.BUSH
+    lvl3[j][23] = TileType.BUSH
 finish_level(lvl3)
 
 lvl4 = get_empty_matrix()
 for i in range(2, 24):
     if i not in [5, 6, 7, 18, 19, 20]:
-        lvl4[4][i] = TILE_CONCRETE
+        lvl4[4][i] = TileType.CONCRETE
 
 for j in [8, 9, 10, 15, 16, 17]:
     for i in [4, 5, 6, 19, 20, 21]:
-        lvl4[j][i] = TILE_BRICK
+        lvl4[j][i] = TileType.BRICK
 
 for i in range(9, 17):
-    lvl4[7][i] = TILE_BUSH
-    lvl4[8][i] = TILE_BUSH
-    lvl4[13][i] = TILE_BUSH
-    lvl4[14][i] = TILE_BUSH
+    lvl4[7][i] = TileType.BUSH
+    lvl4[8][i] = TileType.BUSH
+    lvl4[13][i] = TileType.BUSH
+    lvl4[14][i] = TileType.BUSH
 finish_level(lvl4)
 
 LEVELS = [lvl1, lvl2, lvl3, lvl4]

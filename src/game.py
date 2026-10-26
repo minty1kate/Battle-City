@@ -3,12 +3,19 @@ import sys
 
 import pygame
 import json
-from src.settings import *
+
+from src.settings import (
+    BulletType, StrategyType, GameState, Team, TileType,
+    BLACK, BONUS_DROP_CHANCE, ENEMIES_PER_LEVEL, ENEMY_SPAWN_COLS,
+    FPS, GREEN, HEIGHT, KILL_SCORE, MAX_ENEMIES_ON_MAP, PLAYER_START_POS,
+    RED, SPAWN_DELAY, TILE_SIZE, WHITE, WIDTH, YELLOW
+)
+
 from src.levels import LEVELS
 from src.sprites import Block, PlayerTank, EnemyTank, Bonus, ENEMY_STATS
 
-ENEMY_TYPES = list(ENEMY_STATS)
-ENEMY_STRATEGIES = ['patrol', 'chase', 'base']
+ENEMY_TYPES = list(ENEMY_STATS.keys())
+ENEMY_STRATEGIES = list(StrategyType)
 
 LEVEL_KEYS = {pygame.K_1 + i: i for i in range(len(LEVELS))}
 
@@ -29,7 +36,7 @@ class Game:
         self.enemies = pygame.sprite.Group()
         self.bonuses = pygame.sprite.Group()
 
-        self.state = "menu"
+        self.state = GameState.MENU
         self.level_title_timer = 0
         self.start_new_game()
 
@@ -50,10 +57,10 @@ class Game:
 
         for row_idx, row in enumerate(LEVELS[level_idx]):
             for col_idx, tile in enumerate(row):
-                if tile == TILE_EMPTY:
+                if tile == TileType.EMPTY:
                     continue
                 block = Block(col_idx * TILE_SIZE, row_idx * TILE_SIZE, tile)
-                if tile == TILE_BUSH:
+                if tile == TileType.BUSH:
                     self.bushes.add(block)
                 else:
                     self.all_blocks.add(block)
@@ -68,25 +75,23 @@ class Game:
                 sys.exit()
 
             if event.type == pygame.KEYDOWN:
-                if self.state == "menu" and event.key == pygame.K_RETURN:
-                    self.state = "playing"
-
-                elif self.state in ("game_over", "win") and event.key == pygame.K_r:
-                    self.start_new_game()
-                    self.state = "playing"
-
-                elif self.state in ("playing", "paused"):
-                    if event.key == pygame.K_p:
-                        self.state = "paused" if self.state == "playing" else "playing"
-
-                    elif event.key in LEVEL_KEYS:
-                        self.load_level(LEVEL_KEYS[event.key])
-
-                    elif event.key == pygame.K_F5:
-                        self.save_game()
-
-                    elif event.key == pygame.K_F9:
-                        self.load_game()
+                match self.state:
+                    case GameState.MENU if event.key == pygame.K_RETURN:
+                        self.state = GameState.PLAYING
+                    case GameState.PLAYING:
+                        if event.key in LEVEL_KEYS:
+                            self.load_level(LEVEL_KEYS[event.key])
+                        elif event.key == pygame.K_p:
+                            self.state = GameState.PAUSED
+                        elif event.key == pygame.K_F5:
+                            self.save_game()
+                        elif event.key == pygame.K_F9:
+                            self.load_game()
+                    case GameState.PAUSED if event.key == pygame.K_p:
+                        self.state = GameState.PLAYING
+                    case GameState.GAME_OVER | GameState.WIN if event.key == pygame.K_r:
+                        self.start_new_game()
+                        self.state = GameState.PLAYING
 
     def spawn_enemy(self):
         """Создаёт врага, если на карте есть место"""
@@ -109,7 +114,7 @@ class Game:
     def check_bullets(self):
         """Расчет коллизий пуль, триггер выпадения бонусов"""
         for bullet in list(self.bullets):
-            if bullet.owner_team == "player":
+            if bullet.owner_team == Team.PLAYER:
                 enemy = pygame.sprite.spritecollideany(bullet, self.enemies)
                 if enemy:
                     bullet.kill()
@@ -125,7 +130,7 @@ class Game:
                 bullet.kill()
                 if self.player.invulnerable_timer == 0:
                     self.player.hp -= bullet.damage
-                    if bullet.type == 'incendiary':
+                    if bullet.type == BulletType.INCENDIARY:
                         self.player.burn_timer = 90
 
     def kill_player(self):
@@ -137,20 +142,20 @@ class Game:
         p.burn_timer = 0
         p.rect.topleft = PLAYER_START_POS
         if p.lives < 0:
-            self.state = "game_over"
+            self.state = GameState.GAME_OVER
 
     def check_win_lose(self):
         """Проверка на поражение или победу"""
-        if self.state != "playing":
+        if self.state != GameState.PLAYING:
             return
-        base_alive = any(b.type == TILE_BASE for b in self.all_blocks)
+        base_alive = any(b.type == TileType.BASE for b in self.all_blocks)
         if not base_alive:
-            self.state = "game_over"
+            self.state = GameState.GAME_OVER
         elif self.enemies_killed >= ENEMIES_PER_LEVEL and len(self.enemies) == 0:
             if self.level_idx + 1 < len(LEVELS):
                 self.load_level(self.level_idx + 1)
             else:
-                self.state = "win"
+                self.state = GameState.WIN
 
     def update(self):
         """Обновление состояния всех сущностей"""
@@ -194,7 +199,7 @@ class Game:
 
         self.all_blocks.draw(self.screen)
         self.bonuses.draw(self.screen)
-        if self.state != "game_over":
+        if self.state != GameState.GAME_OVER:
             self.screen.blit(self.player.image, self.player.rect)
         self.enemies.draw(self.screen)
         self.bullets.draw(self.screen)
@@ -205,14 +210,14 @@ class Game:
                 f"Звёзды: {self.player.stars} | Враги: {enemies_left} | Лвл: {self.level_idx + 1}")
         self.screen.blit(self.font_ui.render(info, True, WHITE), (10, 5))
 
-        if self.state in ("game_over", "win"):
-            text, color = ("ИГРА ОКОНЧЕНА", RED) if self.state == "game_over" else ("ПОБЕДА!", GREEN)
+        if self.state in (GameState.GAME_OVER, GameState.WIN):
+            text, color = ("ИГРА ОКОНЧЕНА", RED) if self.state == GameState.GAME_OVER else ("ПОБЕДА!", GREEN)
             box = self.font_big.render(text, True, color).get_rect(center=(WIDTH // 2, HEIGHT // 2))
             pygame.draw.rect(self.screen, BLACK, box.inflate(24, 12))
             self.draw_text_center(self.font_big, text, color, HEIGHT // 2)
             self.draw_text_center(self.font_ui, "R - играть заново", WHITE, HEIGHT // 2 + 50)
 
-        if self.state == "paused":
+        if self.state == GameState.PAUSED:
             box = self.font_big.render("ПАУЗА", True, WHITE).get_rect(center=(WIDTH // 2, HEIGHT // 2))
             pygame.draw.rect(self.screen, BLACK, box.inflate(24, 12))
             self.draw_text_center(self.font_big, "ПАУЗА", WHITE, HEIGHT // 2)
@@ -242,7 +247,7 @@ class Game:
             self.player.stars = data["stars"]
             self.enemies_killed = data["enemies_killed"]
 
-            self.state = "playing"
+            self.state = GameState.PLAYING
             print("Игра загружена!")
         except FileNotFoundError:
             print("Файл сохранения не найден :(")
@@ -250,7 +255,7 @@ class Game:
     def draw(self):
         """Очитска экрана и вызов рендеров"""
         self.screen.fill(BLACK)
-        if self.state == "menu":
+        if self.state == GameState.MENU:
             self.draw_menu()
         else:
             self.draw_game()
@@ -261,6 +266,6 @@ class Game:
         while True:
             self.clock.tick(FPS)
             self.handle_events()
-            if self.state == "playing":
+            if self.state == GameState.PLAYING:
                 self.update()
             self.draw()

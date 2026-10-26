@@ -2,7 +2,10 @@
 import random
 
 import pygame
-from src.settings import *
+from src.settings import (
+    TILE_SIZE, WIDTH, HEIGHT, BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GREY, BROWN, CYAN,
+    BONUS_COLORS, TileType, Team, BulletType, EnemyType, StrategyType
+)
 
 SCREEN_RECT = pygame.Rect(0, 0, WIDTH, HEIGHT)
 
@@ -22,22 +25,20 @@ MOVE_KEYS = {
     'RIGHT': (pygame.K_RIGHT, pygame.K_d),
 }
 
-SOLID_TILES = [TILE_BRICK, TILE_CONCRETE, TILE_WATER, TILE_BORDER]
-BULLET_STOPPERS = [TILE_BRICK, TILE_CONCRETE, TILE_BASE]
+SOLID_TILES = [TileType.BRICK, TileType.CONCRETE, TileType.WATER, TileType.BORDER]
+BULLET_STOPPERS = [TileType.BRICK, TileType.CONCRETE, TileType.BASE]
 
 BULLET_SIZE = 4
-BULLET_SPEED = {'normal': 6, 'weak': 3, 'concrete_breaker': 9, 'incendiary': 6}
-BULLET_COLOR = {'normal': WHITE, 'weak': WHITE, 'concrete_breaker': RED, 'incendiary': YELLOW}
-BULLET_DAMAGE = {'normal': 1.0, 'weak': 0.5, 'concrete_breaker': 1.0, 'incendiary': 1.0}
+BULLET_SPEED = {BulletType.NORMAL: 6, BulletType.WEAK: 3, BulletType.CONCRETE_BREAKER: 9, BulletType.INCENDIARY: 6}
+BULLET_COLOR = {BulletType.NORMAL: WHITE, BulletType.WEAK: WHITE, BulletType.CONCRETE_BREAKER: RED, BulletType.INCENDIARY: YELLOW}
+BULLET_DAMAGE = {BulletType.NORMAL: 1.0, BulletType.WEAK: 0.5, BulletType.CONCRETE_BREAKER: 1.0, BulletType.INCENDIARY: 1.0}
 
 ENEMY_STATS = {
-    'simple': {'speed': 2, 'hp': 1.0, 'bullet': 'weak', 'color': RED, 'shoot_delay': 40},
-    'fast': {'speed': 4, 'hp': 1.0, 'bullet': 'normal', 'color': YELLOW, 'shoot_delay': 40},
-    'shooter': {'speed': 2, 'hp': 2.0, 'bullet': 'concrete_breaker', 'color': CYAN, 'shoot_delay': 20},
-    'armored': {'speed': 1, 'hp': 4.0, 'bullet': 'incendiary', 'color': BROWN, 'shoot_delay': 40},
+    EnemyType.SIMPLE: {'speed': 2, 'hp': 1.0, 'bullet': BulletType.WEAK, 'color': RED, 'shoot_delay': 40},
+    EnemyType.FAST: {'speed': 4, 'hp': 1.0, 'bullet': BulletType.NORMAL, 'color': YELLOW, 'shoot_delay': 40},
+    EnemyType.SHOOTER: {'speed': 2, 'hp': 2.0, 'bullet': BulletType.CONCRETE_BREAKER, 'color': CYAN, 'shoot_delay': 20},
+    EnemyType.ARMORED: {'speed': 1, 'hp': 4.0, 'bullet': BulletType.INCENDIARY, 'color': BROWN, 'shoot_delay': 40},
 }
-
-BONUS_COLORS = {'score': YELLOW, 'life': RED, 'star': WHITE, 'invul': CYAN}
 
 
 def align(value):
@@ -52,71 +53,67 @@ class Block(pygame.sprite.Sprite):
         self.type = tile_type
         self.image = pygame.Surface((TILE_SIZE, TILE_SIZE))
         self.rect = self.image.get_rect(topleft=(x, y))
-        self.hp = 4.0 if tile_type == TILE_BRICK else 1.0
+        self.hp = 4.0 if tile_type == TileType.BRICK else 1.0
         self.update_appearance()
 
     def update_appearance(self):
         """Создает внешний вид блока"""
         sz = TILE_SIZE
 
-        if self.type == TILE_BRICK:
-            self.image.fill(BROWN)
-            for y in range(0, sz, 6):
-                pygame.draw.line(self.image, BLACK, (0, y), (sz, y), 1)
-                offset = 4 if (y // 6) % 2 == 0 else 0
-                for x in range(offset, sz, 8):
-                    pygame.draw.line(self.image, BLACK, (x, y), (x, y + 6), 1)
-            pygame.draw.rect(self.image, BLACK, (0, 0, sz, sz), 1)
-
-        elif self.type == TILE_CONCRETE:
-            self.image.fill(GREY)
-            pygame.draw.rect(self.image, WHITE, (0, 0, sz, sz), 1)
-
-        elif self.type == TILE_WATER:
-            self.image.fill(BLUE)
-            for y in range(4, sz, 8):
-                pygame.draw.arc(self.image, (100, 150, 255), (2, y, sz // 2, 6), 0, math.pi, 1)
-                pygame.draw.arc(self.image, (100, 150, 255), (sz // 2, y + 2, sz // 2, 6), 0, math.pi, 1)
-
-        elif self.type == TILE_ICE:
-            self.image.fill(CYAN)
-            pygame.draw.line(self.image, WHITE, (2, 2), (sz - 4, sz - 4), 1)
-            pygame.draw.line(self.image, WHITE, (sz - 6, 4), (sz - 12, 10), 1)
-            pygame.draw.line(self.image, WHITE, (4, sz - 8), (10, sz - 14), 1)
-            pygame.draw.rect(self.image, (100, 240, 240), (0, 0, sz, sz), 1)
-
-        elif self.type == TILE_BUSH:
-            self.image.fill((10, 80, 10))
-            light_green = (110, 210, 10)
-            half = sz // 2
-            pygame.draw.rect(self.image, light_green, (2, 2, half - 4, half - 4))
-            pygame.draw.rect(self.image, light_green, (half + 2, half + 2, half - 4, half - 4))
-            pygame.draw.rect(self.image, BLACK, (half // 2, half // 2, 3, 3))
-            pygame.draw.rect(self.image, BLACK, (half + half // 2, half + half // 2, 3, 3))
-            pygame.draw.rect(self.image, light_green, (half + 4, 4, 3, 3))
-            pygame.draw.rect(self.image, light_green, (4, half + 4, 3, 3))
-
-        elif self.type == TILE_BASE:
-            self.image.fill(YELLOW)
-            pygame.draw.circle(self.image, RED, (sz // 2, sz // 2), sz // 3)
-
-        elif self.type == TILE_BORDER:
-            self.image.fill(BLACK)
+        match self.type:
+            case TileType.BRICK:
+                self.image.fill(BROWN)
+                for y in range(0, sz, 6):
+                    pygame.draw.line(self.image, BLACK, (0, y), (sz, y), 1)
+                    offset = 4 if (y // 6) % 2 == 0 else 0
+                    for x in range(offset, sz, 8):
+                        pygame.draw.line(self.image, BLACK, (x, y), (x, y + 6), 1)
+                pygame.draw.rect(self.image, BLACK, (0, 0, sz, sz), 1)
+            case TileType.CONCRETE:
+                self.image.fill(GREY)
+                pygame.draw.rect(self.image, WHITE, (0, 0, sz, sz), 1)
+            case TileType.WATER:
+                self.image.fill(BLUE)
+                for y in range(4, sz, 8):
+                    pygame.draw.arc(self.image, (100, 150, 255), (2, y, sz // 2, 6), 0, math.pi, 1)
+                    pygame.draw.arc(self.image, (100, 150, 255), (sz // 2, y + 2, sz // 2, 6), 0, math.pi, 1)
+            case TileType.ICE:
+                self.image.fill(CYAN)
+                pygame.draw.line(self.image, WHITE, (2, 2), (sz - 4, sz - 4), 1)
+                pygame.draw.line(self.image, WHITE, (sz - 6, 4), (sz - 12, 10), 1)
+                pygame.draw.line(self.image, WHITE, (4, sz - 8), (10, sz - 14), 1)
+                pygame.draw.rect(self.image, (100, 240, 240), (0, 0, sz, sz), 1)
+            case TileType.BUSH:
+                self.image.fill((10, 80, 10))
+                light_green = (110, 210, 10)
+                half = sz // 2
+                pygame.draw.rect(self.image, light_green, (2, 2, half - 4, half - 4))
+                pygame.draw.rect(self.image, light_green, (half + 2, half + 2, half - 4, half - 4))
+                pygame.draw.rect(self.image, BLACK, (half // 2, half // 2, 3, 3))
+                pygame.draw.rect(self.image, BLACK, (half + half // 2, half + half // 2, 3, 3))
+                pygame.draw.rect(self.image, light_green, (half + 4, 4, 3, 3))
+                pygame.draw.rect(self.image, light_green, (4, half + 4, 3, 3))
+            case TileType.BASE:
+                self.image.fill(YELLOW)
+                pygame.draw.circle(self.image, RED, (sz // 2, sz // 2), sz // 3)
+            case TileType.BORDER:
+                self.image.fill(BLACK)
 
     def take_damage(self, bullet_type, owner_stats=0):
         """Получение урона"""
-        if self.type == TILE_BRICK:
-            damage = 2.0 if owner_stats >= 3 else 1.0
-            if bullet_type == 'weak':
-                damage = 0.5
-            self.hp -= damage
-            if self.hp <= 0:
+        match self.type:
+            case TileType.BRICK:
+                damage = 2.0 if owner_stats >= 3 else 1.0
+                if bullet_type == BulletType.WEAK:
+                    damage = 0.5
+                self.hp -= damage
+                if self.hp <= 0:
+                    self.kill()
+            case TileType.CONCRETE:
+                if owner_stats >= 3 or bullet_type == BulletType.CONCRETE_BREAKER:
+                    self.kill()
+            case TileType.BASE:
                 self.kill()
-        elif self.type == TILE_CONCRETE:
-            if owner_stats >= 3 or bullet_type == 'concrete_breaker':
-                self.kill()
-        elif self.type == TILE_BASE:
-            self.kill()
 
 
 class Bullet(pygame.sprite.Sprite):
@@ -189,7 +186,7 @@ class Tank(pygame.sprite.Sprite):
         """Возвращает True, если танк упёрся в стену"""
         self.is_sliding = False
         for block in pygame.sprite.spritecollide(self, self.all_blocks, False):
-            if block.type == TILE_ICE:
+            if block.type == TileType.ICE:
                 self.is_sliding = True
             elif block.type in SOLID_TILES:
                 self.rect.x = old_x
@@ -250,7 +247,7 @@ class PlayerTank(Tank):
         self.max_hp = 3.0
         self.lives = 3
         self.speed = 3
-        self.bullet_type = 'normal'
+        self.bullet_type = BulletType.NORMAL
         self.score = 0
         self.stars = 0
 
@@ -268,10 +265,11 @@ class PlayerTank(Tank):
 
         if pressed:
             speed = self.speed + 2 if self.is_sliding else self.speed
-            if pressed in ('UP', 'DOWN') and self.direction in ('LEFT', 'RIGHT'):
-                self.rect.x = align(self.rect.x)
-            elif pressed in ('LEFT', 'RIGHT') and self.direction in ('UP', 'DOWN'):
-                self.rect.y = align(self.rect.y)
+            match pressed:
+                case 'UP' | 'DOWN' if self.direction in ('LEFT', 'RIGHT'):
+                    self.rect.x = align(self.rect.x)
+                case 'LEFT' | 'RIGHT' if self.direction in ('UP', 'DOWN'):
+                    self.rect.y = align(self.rect.y)
             self.direction = pressed
             dx, dy = DIRECTIONS[pressed]
             self.rect.x += dx * speed
@@ -290,7 +288,7 @@ class PlayerTank(Tank):
         self.shoot_delay = 25 if self.stars >= 2 else 40
 
         if keys[pygame.K_SPACE] and self.cooldown == 0:
-            self.shoot(bullet_group, self.bullet_type, "player", self.stars)
+            self.shoot(bullet_group, self.bullet_type, Team.PLAYER, self.stars)
 
         self.update_image(GREEN if self.invulnerable_timer == 0 else CYAN)
 
@@ -314,7 +312,7 @@ class EnemyTank(Tank):
 
     def heal(self):
         """Самолечение танка"""
-        if self.enemy_type != 'armored':
+        if self.enemy_type != EnemyType.ARMORED:
             return
         self.heal_timer += 1
         if self.heal_timer >= 180:
@@ -324,8 +322,8 @@ class EnemyTank(Tank):
     def get_speed(self, enemy_group):
         """Ускорение танка"""
         speed = self.speed
-        if self.enemy_type == 'shooter':
-            shooters = sum(1 for e in enemy_group if e.enemy_type == 'shooter')
+        if self.enemy_type == EnemyType.SHOOTER:
+            shooters = sum(1 for e in enemy_group if e.enemy_type == EnemyType.SHOOTER)
             if shooters >= 2:
                 speed += 1
         if self.is_sliding:
@@ -339,18 +337,19 @@ class EnemyTank(Tank):
             return
         self.ai_timer = 0
 
-        if self.strategy == 'chase':
-            if abs(player.rect.x - self.rect.x) > abs(player.rect.y - self.rect.y):
-                self.direction = 'RIGHT' if player.rect.x > self.rect.x else 'LEFT'
-            else:
-                self.direction = 'DOWN' if player.rect.y > self.rect.y else 'UP'
-        elif self.strategy == 'patrol':
-            self.direction = random.choice(list(DIRECTIONS))
-        elif self.strategy == 'base':
-            if random.random() < 0.6:
-                self.direction = 'DOWN'
-            else:
-                self.direction = 'RIGHT' if (WIDTH // 2) > self.rect.x else 'LEFT'
+        match self.strategy:
+            case StrategyType.CHASE:
+                if abs(player.rect.x - self.rect.x) > abs(player.rect.y - self.rect.y):
+                    self.direction = 'RIGHT' if player.rect.x > self.rect.x else 'LEFT'
+                else:
+                    self.direction = 'DOWN' if player.rect.y > self.rect.y else 'UP'
+            case StrategyType.PATROL:
+                self.direction = random.choice(list(DIRECTIONS))
+            case StrategyType.BASE:
+                if random.random() < 0.6:
+                    self.direction = 'DOWN'
+                else:
+                    self.direction = 'RIGHT' if (WIDTH // 2) > self.rect.x else 'LEFT'
 
     def sees_player(self, player):
         """Поведение вражеского танка, когда он видит игрока"""
@@ -382,7 +381,7 @@ class EnemyTank(Tank):
             self.ai_timer = 0
 
         if self.cooldown == 0 and self.sees_player(player):
-            self.shoot(bullet_group, self.bullet_type, "enemy")
+            self.shoot(bullet_group, self.bullet_type, Team.ENEMY)
 
         self.update_image(self.color)
 
@@ -398,12 +397,14 @@ class Bonus(pygame.sprite.Sprite):
 
     def apply(self, player):
         """Применение бонуса"""
-        if self.type == 'score':
-            player.score += 500
-        elif self.type == 'life':
-            player.lives += 1
-        elif self.type == 'star':
-            if player.stars < 3:
-                player.stars += 1
-        elif self.type == 'invul':
-            player.invulnerable_timer = 300
+        match self.type:
+            case 'score':
+                player.score += 500
+            case 'life':
+                player.lives += 1
+            case 'star':
+                if player.stars < 3:
+                    player.stars += 1
+            case 'invul':
+                player.invulnerable_timer = 300
+        self.kill()
