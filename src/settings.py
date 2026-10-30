@@ -4,6 +4,7 @@
 """
 from enum import Enum, IntEnum
 
+
 class GameState(Enum):
     """Состояние игрового процесса"""
     MENU = "menu"
@@ -12,10 +13,12 @@ class GameState(Enum):
     GAME_OVER = "game_over"
     WIN = "win"
 
+
 class Team(Enum):
     """Принадлежность  командам"""
     PLAYER = "player"
     ENEMY = "enemy"
+
 
 class BulletType(Enum):
     """Типы вооружения"""
@@ -24,6 +27,7 @@ class BulletType(Enum):
     CONCRETE_BREAKER = "concrete_breaker"
     INCENDIARY = "incendiary"
 
+
 class EnemyType(Enum):
     """Разновидности вражеских танков"""
     SIMPLE = "simple"
@@ -31,11 +35,29 @@ class EnemyType(Enum):
     SHOOTER = "shooter"
     ARMORED = "armored"
 
+
 class StrategyType(Enum):
     """Стратегии поведения врагов"""
     PATROL = "patrol"
     CHASE = "chase"
     BASE = "base"
+
+
+class Direction(Enum):
+    """Направления движения"""
+    UP = (0, -1)
+    DOWN = (0, 1)
+    LEFT = (-1, 0)
+    RIGHT = (1, 0)
+
+
+class BonusType(Enum):
+    """Виды бонусов"""
+    SCORE = "score"
+    LIFE = "life"
+    STAR = "star"
+    INVULNERABLE = "invul"
+
 
 class TileType(IntEnum):
     """Типы блоков на карте"""
@@ -47,6 +69,7 @@ class TileType(IntEnum):
     BUSH = 5
     BASE = 6
     BORDER = 7
+
 
 TILE_SIZE = 24
 GRID_SIZE = 26
@@ -73,8 +96,8 @@ KILL_SCORE = 200
 BONUS_DROP_CHANCE = 0.3
 
 BONUS_COLORS = {
-    'score': YELLOW,
-    'life': RED,
-    'star': WHITE,
-    'invul': CYAN
+    BonusType.SCORE: YELLOW,
+    BonusType.LIFE: RED,
+    BonusType.STAR: WHITE,
+    BonusType.INVULNERABLE: CYAN,
 }

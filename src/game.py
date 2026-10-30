@@ -2,7 +2,7 @@
 import sys
 
 import pygame
-import json
+from src import savegame
 
 from src.settings import (
     BulletType, StrategyType, GameState, Team, TileType,
@@ -18,6 +18,7 @@ ENEMY_TYPES = list(ENEMY_STATS.keys())
 ENEMY_STRATEGIES = list(StrategyType)
 
 LEVEL_KEYS = {pygame.K_1 + i: i for i in range(len(LEVELS))}
+MESSAGE_FRAMES = 120
 
 
 class Game:
@@ -38,6 +39,8 @@ class Game:
 
         self.state = GameState.MENU
         self.level_title_timer = 0
+        self.message = ""
+        self.message_timer = 0
         self.start_new_game()
 
     def start_new_game(self):
@@ -75,23 +78,29 @@ class Game:
                 sys.exit()
 
             if event.type == pygame.KEYDOWN:
-                match self.state:
-                    case GameState.MENU if event.key == pygame.K_RETURN:
-                        self.state = GameState.PLAYING
-                    case GameState.PLAYING:
-                        if event.key in LEVEL_KEYS:
-                            self.load_level(LEVEL_KEYS[event.key])
-                        elif event.key == pygame.K_p:
-                            self.state = GameState.PAUSED
-                        elif event.key == pygame.K_F5:
-                            self.save_game()
-                        elif event.key == pygame.K_F9:
-                            self.load_game()
-                    case GameState.PAUSED if event.key == pygame.K_p:
-                        self.state = GameState.PLAYING
-                    case GameState.GAME_OVER | GameState.WIN if event.key == pygame.K_r:
-                        self.start_new_game()
-                        self.state = GameState.PLAYING
+                self.handle_keydown(event.key)
+
+    def handle_keydown(self, key):
+        """Реакция на нажатие клавиши зависит от состояния игры"""
+        match (self.state, key):
+            case (GameState.MENU, pygame.K_RETURN):
+                self.state = GameState.PLAYING
+            case (GameState.MENU, pygame.K_F9):
+                self.load_game()
+            case (GameState.PLAYING, pygame.K_p):
+                self.state = GameState.PAUSED
+            case (GameState.PAUSED, pygame.K_p):
+                self.state = GameState.PLAYING
+            case (GameState.PLAYING | GameState.PAUSED, pygame.K_F5):
+                self.save_game()
+            case (GameState.PLAYING | GameState.PAUSED, pygame.K_F9):
+                self.load_game()
+            case (GameState.PLAYING, _) if key in LEVEL_KEYS:
+                self.load_level(LEVEL_KEYS[key])
+            case (GameState.GAME_OVER | GameState.WIN, pygame.K_r):
+                self.start_new_game()
+                self.state = GameState.PLAYING
+
 
     def spawn_enemy(self):
         """Создаёт врага, если на карте есть место"""
@@ -114,24 +123,24 @@ class Game:
     def check_bullets(self):
         """Расчет коллизий пуль, триггер выпадения бонусов"""
         for bullet in list(self.bullets):
-            if bullet.owner_team == Team.PLAYER:
-                enemy = pygame.sprite.spritecollideany(bullet, self.enemies)
-                if enemy:
+            match bullet.owner_team:
+                case Team.PLAYER:
+                    enemy = pygame.sprite.spritecollideany(bullet, self.enemies)
+                    if enemy:
+                        bullet.kill()
+                        enemy.hp -= bullet.damage
+                        if enemy.hp <= 0:
+                            enemy.kill()
+                            self.player.score += KILL_SCORE
+                            self.enemies_killed += 1
+                            if random.random() < BONUS_DROP_CHANCE:
+                                self.bonuses.add(Bonus(enemy.rect.centerx, enemy.rect.centery))
+                case Team.ENEMY if bullet.rect.colliderect(self.player.rect):
                     bullet.kill()
-                    enemy.hp -= bullet.damage
-                    if enemy.hp <= 0:
-                        enemy.kill()
-                        self.player.score += KILL_SCORE
-                        self.enemies_killed += 1
-                        if random.random() < BONUS_DROP_CHANCE:
-                            self.bonuses.add(Bonus(enemy.rect.centerx, enemy.rect.centery))
-
-            elif bullet.rect.colliderect(self.player.rect):
-                bullet.kill()
-                if self.player.invulnerable_timer == 0:
-                    self.player.hp -= bullet.damage
-                    if bullet.type == BulletType.INCENDIARY:
-                        self.player.burn_timer = 90
+                    if self.player.invulnerable_timer == 0:
+                        self.player.hp -= bullet.damage
+                        if bullet.type == BulletType.INCENDIARY:
+                            self.player.burn_timer = 90
 
     def kill_player(self):
         """Обработка смерти игрока"""
@@ -190,11 +199,15 @@ class Game:
         """Отрисовка главного меню"""
         self.draw_text_center(self.font_big, "BATTLE CITY", YELLOW, HEIGHT // 3)
         self.draw_text_center(self.font_ui, "Нажмите ENTER для старта", WHITE, HEIGHT // 2 + 40)
+        if savegame.save_exists():
+            self.draw_text_center(self.font_ui, "F9 - продолжить сохранённую игру", WHITE,
+                                  HEIGHT // 2 + 70)
 
     def draw_game(self):
         """Отрисовка игровых объектов"""
         if self.level_title_timer > 0:
-            self.draw_text_center(self.font_big, f"УРОВЕНЬ {self.level_idx + 1}", WHITE, HEIGHT // 2)
+            title = f"УРОВЕНЬ {self.level_idx + 1}"
+            self.draw_text_center(self.font_big, title, WHITE, HEIGHT // 2)
             return
 
         self.all_blocks.draw(self.screen)
@@ -210,47 +223,42 @@ class Game:
                 f"Звёзды: {self.player.stars} | Враги: {enemies_left} | Лвл: {self.level_idx + 1}")
         self.screen.blit(self.font_ui.render(info, True, WHITE), (10, 5))
 
-        if self.state in (GameState.GAME_OVER, GameState.WIN):
-            text, color = ("ИГРА ОКОНЧЕНА", RED) if self.state == GameState.GAME_OVER else ("ПОБЕДА!", GREEN)
-            box = self.font_big.render(text, True, color).get_rect(center=(WIDTH // 2, HEIGHT // 2))
-            pygame.draw.rect(self.screen, BLACK, box.inflate(24, 12))
-            self.draw_text_center(self.font_big, text, color, HEIGHT // 2)
-            self.draw_text_center(self.font_ui, "R - играть заново", WHITE, HEIGHT // 2 + 50)
+        match self.state:
+            case GameState.GAME_OVER:
+                self.draw_banner("ИГРА ОКОНЧЕНА", RED, "R - играть заново")
+            case GameState.WIN:
+                self.draw_banner("ПОБЕДА!", GREEN, "R - играть заново")
+            case GameState.PAUSED:
+                self.draw_banner("ПАУЗА", WHITE, "P - продолжить, F5 - сохранить, F9 - загрузить")
 
-        if self.state == GameState.PAUSED:
-            box = self.font_big.render("ПАУЗА", True, WHITE).get_rect(center=(WIDTH // 2, HEIGHT // 2))
-            pygame.draw.rect(self.screen, BLACK, box.inflate(24, 12))
-            self.draw_text_center(self.font_big, "ПАУЗА", WHITE, HEIGHT // 2)
+    def draw_banner(self, text, color, hint):
+        """Надпись по центру и подсказка под ней"""
+        box = self.font_big.render(text, True, color).get_rect(center=(WIDTH // 2, HEIGHT // 2))
+        pygame.draw.rect(self.screen, BLACK, box.inflate(24, 12))
+        self.draw_text_center(self.font_big, text, color, HEIGHT // 2)
+        self.draw_text_center(self.font_ui, hint, WHITE, HEIGHT // 2 + 50)
+
+    def show_message(self, text):
+        """Сообщение внизу экрана"""
+        self.message = text
+        self.message_timer = MESSAGE_FRAMES
 
 
     def save_game(self):
         """Сохранение прогресса"""
-        data = {
-            "level": self.level_idx,
-            "score": self.player.score,
-            "lives": self.player.lives,
-            "stars": self.player.stars,
-            "enemies_killed": self.enemies_killed
-        }
-        with open("save.json", "w") as file:
-            json.dump(data, file)
-        print("Игра сохранена!")
+        try:
+            savegame.save_to_file(self)
+            self.show_message("Игра сохранена")
+        except savegame.SaveError as err:
+            self.show_message(str(err))
 
     def load_game(self):
         """Загрузка прогресса"""
         try:
-            with open("save.json", "r") as file:
-                data = json.load(file)
-            self.load_level(data["level"])
-            self.player.score = data["score"]
-            self.player.lives = data["lives"]
-            self.player.stars = data["stars"]
-            self.enemies_killed = data["enemies_killed"]
-
-            self.state = GameState.PLAYING
-            print("Игра загружена!")
-        except FileNotFoundError:
-            print("Файл сохранения не найден :(")
+            savegame.load_from_file(self)
+            self.show_message("Игра загружена")
+        except savegame.SaveError as err:
+            self.show_message(str(err))
 
     def draw(self):
         """Очитска экрана и вызов рендеров"""
@@ -259,6 +267,8 @@ class Game:
             self.draw_menu()
         else:
             self.draw_game()
+        if self.message_timer > 0:
+            self.draw_text_center(self.font_ui, self.message, YELLOW, HEIGHT - 20)
         pygame.display.flip()
 
     def run(self):
@@ -268,4 +278,6 @@ class Game:
             self.handle_events()
             if self.state == GameState.PLAYING:
                 self.update()
+            if self.message_timer > 0:
+                self.message_timer -= 1
             self.draw()
