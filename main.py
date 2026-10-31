@@ -8,6 +8,9 @@ EPILOG = """\
   пробел           - выстрел
   ENTER            - старт в меню
   1, 2, 3, 4       - перейти на уровень (отладка)
+  P                - пауза
+  F5               - сохранить игру
+  F9               - загрузить сохранение
   R                - начать заново после победы или поражения
 """
 
@@ -22,6 +25,8 @@ def parse_args(argv=None):
         add_help=False,
     )
     parser.add_argument("-h", "--help", action="help", help="показать эту справку и выйти")
+    parser.add_argument("--no-sound", action="store_true",
+                        help="запустить игру без звука и музыки")
     parser.add_argument("--debug", action="store_true",
                         help="режим отладки: при ошибке показывать Traceback")
     return parser.parse_args(argv)
@@ -32,7 +37,7 @@ def main(argv=None):
     args = parse_args(argv)
     try:
         from src.game import Game
-        Game().run()
+        Game(sound=not args.no_sound).run()
     except KeyboardInterrupt:
         print("\nПрервано пользователем", file=sys.stderr)
         return 130
