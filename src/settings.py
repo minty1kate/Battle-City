@@ -26,6 +26,7 @@ class BulletType(Enum):
     WEAK = "weak"
     CONCRETE_BREAKER = "concrete_breaker"
     INCENDIARY = "incendiary"
+    SNIPER = "sniper"
 
 
 class EnemyType(Enum):
@@ -34,6 +35,8 @@ class EnemyType(Enum):
     FAST = "fast"
     SHOOTER = "shooter"
     ARMORED = "armored"
+    SNIPER = "sniper"
+    SCOUT = "scout"
 
 
 class StrategyType(Enum):
@@ -57,6 +60,10 @@ class BonusType(Enum):
     LIFE = "life"
     STAR = "star"
     INVULNERABLE = "invul"
+    SPEED = "speed"
+    BOMB = "bomb"
+    FREEZE = "freeze"
+    REPAIR = "repair"
 
 
 class TileType(IntEnum):
@@ -69,6 +76,24 @@ class TileType(IntEnum):
     BUSH = 5
     BASE = 6
     BORDER = 7
+    MUD = 8
+    MINE = 9
+
+
+class SoundEvent(Enum):
+    """События, на которые игра отвечает звуком"""
+    SHOT = "shot"
+    ENEMY_SHOT = "enemy_shot"
+    HIT = "hit"
+    EXPLOSION = "explosion"
+    PLAYER_HIT = "player_hit"
+    MINE = "mine"
+    BONUS = "bonus"
+    LEVEL_START = "level_start"
+    PAUSE = "pause"
+    SAVE = "save"
+    GAME_OVER = "game_over"
+    WIN = "win"
 
 
 TILE_SIZE = 24
@@ -86,6 +111,11 @@ YELLOW = (255, 255, 0)
 GREY = (128, 128, 128)
 BROWN = (139, 69, 19)
 CYAN = (0, 255, 255)
+ORANGE = (255, 140, 0)
+PURPLE = (160, 32, 240)
+LIME = (150, 255, 0)
+LIGHT_BLUE = (135, 206, 250)
+PINK = (255, 105, 180)
 
 ENEMIES_PER_LEVEL = 10
 MAX_ENEMIES_ON_MAP = 5
@@ -94,10 +124,17 @@ ENEMY_SPAWN_COLS = [2, 12, 22]
 PLAYER_START_POS = (2 * TILE_SIZE, 24 * TILE_SIZE)
 KILL_SCORE = 200
 BONUS_DROP_CHANCE = 0.3
+MINE_DAMAGE = 1.0
+SPEED_BONUS_FRAMES = 600
+FREEZE_FRAMES = 300
 
 BONUS_COLORS = {
     BonusType.SCORE: YELLOW,
     BonusType.LIFE: RED,
     BonusType.STAR: WHITE,
     BonusType.INVULNERABLE: CYAN,
+    BonusType.SPEED: LIME,
+    BonusType.BOMB: ORANGE,
+    BonusType.FREEZE: LIGHT_BLUE,
+    BonusType.REPAIR: PINK,
 }

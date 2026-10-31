@@ -82,4 +82,21 @@ for i in range(9, 17):
     lvl4[14][i] = TileType.BUSH
 finish_level(lvl4)
 
-LEVELS = [lvl1, lvl2, lvl3, lvl4]
+lvl5 = get_empty_matrix()
+for j in range(9, 17):
+    for i in range(5, 21):
+        lvl5[j][i] = TileType.MUD
+
+for i in range(4, 22, 3):
+    lvl5[7][i] = TileType.MINE
+    lvl5[18][i] = TileType.MINE
+
+for j in (11, 12, 13, 14):
+    lvl5[j][2] = TileType.CONCRETE
+    lvl5[j][23] = TileType.CONCRETE
+for i in range(8, 18, 3):
+    lvl5[4][i] = TileType.BRICK
+    lvl5[5][i] = TileType.BRICK
+finish_level(lvl5)
+
+LEVELS = [lvl1, lvl2, lvl3, lvl4, lvl5]

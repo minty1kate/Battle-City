@@ -5,6 +5,7 @@ from typing import NamedTuple
 import pygame
 from src.settings import (
     TILE_SIZE, WIDTH, HEIGHT, BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GREY, BROWN, CYAN,
+    ORANGE, PURPLE, MINE_DAMAGE, SPEED_BONUS_FRAMES,
     BONUS_COLORS, TileType, Team, BulletType, EnemyType, StrategyType, Direction, BonusType
 )
 
@@ -27,18 +28,21 @@ BULLET_SPEED = {
     BulletType.WEAK: 3,
     BulletType.CONCRETE_BREAKER: 9,
     BulletType.INCENDIARY: 6,
+    BulletType.SNIPER: 12,
 }
 BULLET_COLOR = {
     BulletType.NORMAL: WHITE,
     BulletType.WEAK: WHITE,
     BulletType.CONCRETE_BREAKER: RED,
     BulletType.INCENDIARY: YELLOW,
+    BulletType.SNIPER: PURPLE,
 }
 BULLET_DAMAGE = {
     BulletType.NORMAL: 1.0,
     BulletType.WEAK: 0.5,
     BulletType.CONCRETE_BREAKER: 1.0,
     BulletType.INCENDIARY: 1.0,
+    BulletType.SNIPER: 2.0,
 }
 
 
@@ -56,6 +60,8 @@ ENEMY_STATS = {
     EnemyType.FAST: EnemyStats(4, 1.0, BulletType.NORMAL, YELLOW, 40),
     EnemyType.SHOOTER: EnemyStats(2, 2.0, BulletType.CONCRETE_BREAKER, CYAN, 20),
     EnemyType.ARMORED: EnemyStats(1, 4.0, BulletType.INCENDIARY, BROWN, 40),
+    EnemyType.SNIPER: EnemyStats(2, 2.0, BulletType.SNIPER, PURPLE, 90),
+    EnemyType.SCOUT: EnemyStats(5, 0.5, BulletType.WEAK, ORANGE, 60),
 }
 
 
@@ -117,14 +123,26 @@ class Block(pygame.sprite.Sprite):
                 pygame.draw.circle(self.image, RED, (sz // 2, sz // 2), sz // 3)
             case TileType.BORDER:
                 self.image.fill(BLACK)
+            case TileType.MUD:
+                self.image.fill((92, 64, 38))
+                for x, y in ((4, 5), (14, 3), (9, 11), (18, 14), (5, 17), (13, 19)):
+                    pygame.draw.circle(self.image, (60, 40, 22), (x, y), 2)
+            case TileType.MINE:
+                self.image.fill((30, 30, 30))
+                pygame.draw.circle(self.image, (70, 70, 70), (sz // 2, sz // 2), sz // 4)
+                pygame.draw.circle(self.image, RED, (sz // 2, sz // 2), 3)
 
     def take_damage(self, bullet_type, owner_stats=0):
         """Получение урона"""
         match self.type:
             case TileType.BRICK:
-                damage = 2.0 if owner_stats >= 3 else 1.0
-                if bullet_type == BulletType.WEAK:
-                    damage = 0.5
+                match bullet_type:
+                    case BulletType.WEAK:
+                        damage = 0.5
+                    case BulletType.SNIPER:
+                        damage = 2.0
+                    case _:
+                        damage = 2.0 if owner_stats >= 3 else 1.0
                 self.hp -= damage
                 if self.hp <= 0:
                     self.kill()
@@ -187,6 +205,8 @@ class Tank(pygame.sprite.Sprite):
         self.shoot_delay = 40
 
         self.is_sliding = False
+        self.is_slowed = False
+        self.mine_hit = False
         self.burn_timer = 0
         self.invulnerable_timer = 0
 
@@ -204,10 +224,15 @@ class Tank(pygame.sprite.Sprite):
     def check_tile_collisions(self, old_x, old_y, other_tanks=()):
         """Возвращает True, если танк упёрся в стену"""
         self.is_sliding = False
+        self.is_slowed = False
         for block in pygame.sprite.spritecollide(self, self.all_blocks, False):
             match block.type:
                 case TileType.ICE:
                     self.is_sliding = True
+                case TileType.MUD:
+                    self.is_slowed = True
+                case TileType.MINE:
+                    self.step_on_mine(block)
                 case TileType.BRICK | TileType.CONCRETE | TileType.WATER | TileType.BORDER:
                     self.rect.x = old_x
                     self.rect.y = old_y
@@ -224,6 +249,13 @@ class Tank(pygame.sprite.Sprite):
                 return True
 
         return False
+
+    def step_on_mine(self, block):
+        """Мина взрывается и исчезает"""
+        block.kill()
+        self.mine_hit = True
+        if self.invulnerable_timer == 0:
+            self.hp -= MINE_DAMAGE
 
     def shoot(self, bullet_group, bullet_type, team, stars=0):
         """Стрельба"""
@@ -270,10 +302,13 @@ class PlayerTank(Tank):
         self.bullet_type = BulletType.NORMAL
         self.score = 0
         self.stars = 0
+        self.speed_timer = 0
 
     def update(self, keys, bullet_group, enemy_group):
         """Поведение танка на карте, движение, стрельба"""
         self.handle_effects()
+        if self.speed_timer > 0:
+            self.speed_timer -= 1
         old_x, old_y = self.rect.x, self.rect.y
         moved = False
 
@@ -283,8 +318,12 @@ class PlayerTank(Tank):
                 pressed = direction
                 break
 
-        if pressed:
+        if pressed is not None:
             speed = self.speed + 2 if self.is_sliding else self.speed
+            if self.speed_timer > 0:
+                speed += 1
+            if self.is_slowed:
+                speed = max(1, speed // 2)
             match (pressed, self.direction):
                 case (Direction.UP | Direction.DOWN, Direction.LEFT | Direction.RIGHT):
                     self.rect.x = align(self.rect.x)
@@ -348,6 +387,8 @@ class EnemyTank(Tank):
                 speed += 1
         if self.is_sliding:
             speed += 1
+        if self.is_slowed:
+            speed = max(1, speed // 2)
         return speed
 
     def choose_direction(self, player):
@@ -430,4 +471,8 @@ class Bonus(pygame.sprite.Sprite):
                     player.stars += 1
             case BonusType.INVULNERABLE:
                 player.invulnerable_timer = 300
+            case BonusType.SPEED:
+                player.speed_timer = SPEED_BONUS_FRAMES
+            case BonusType.REPAIR:
+                player.hp = player.max_hp
         self.kill()

@@ -3,12 +3,13 @@ import sys
 
 import pygame
 from src import savegame
+from src.audio import AudioManager, configure_mixer
 
 from src.settings import (
-    BulletType, StrategyType, GameState, Team, TileType,
+    BonusType, BulletType, SoundEvent, StrategyType, GameState, Team, TileType,
     BLACK, BONUS_DROP_CHANCE, ENEMIES_PER_LEVEL, ENEMY_SPAWN_COLS,
     FPS, GREEN, HEIGHT, KILL_SCORE, MAX_ENEMIES_ON_MAP, PLAYER_START_POS,
-    RED, SPAWN_DELAY, TILE_SIZE, WHITE, WIDTH, YELLOW
+    RED, SPAWN_DELAY, TILE_SIZE, WHITE, WIDTH, YELLOW, FREEZE_FRAMES
 )
 
 from src.levels import LEVELS
@@ -23,7 +24,8 @@ MESSAGE_FRAMES = 120
 
 class Game:
     """Класс, реализующий игровой движок"""
-    def __init__(self):
+    def __init__(self, sound=True):
+        configure_mixer()
         pygame.init()
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Battle City")
@@ -41,6 +43,8 @@ class Game:
         self.level_title_timer = 0
         self.message = ""
         self.message_timer = 0
+        self.freeze_timer = 0
+        self.audio = AudioManager(enabled=sound)
         self.start_new_game()
 
     def start_new_game(self):
@@ -54,6 +58,7 @@ class Game:
         self.enemies_killed = 0
         self.spawn_timer = 0
         self.level_title_timer = 60
+        self.freeze_timer = 0
 
         for group in (self.all_blocks, self.bushes, self.bullets, self.enemies, self.bonuses):
             group.empty()
@@ -69,6 +74,32 @@ class Game:
                     self.all_blocks.add(block)
 
         self.player.rect.topleft = PLAYER_START_POS
+        if self.state == GameState.PLAYING:
+            self.audio.play(SoundEvent.LEVEL_START)
+
+
+    def set_state(self, state):
+        """Меняет состояние игры и включает, ставит на паузу или останавливает музыку"""
+        previous = self.state
+        self.state = state
+        match state:
+            case GameState.PLAYING if previous == GameState.PAUSED:
+                self.audio.resume_music()
+            case GameState.PLAYING:
+                self.audio.start_music()
+                self.audio.play(SoundEvent.LEVEL_START)
+            case GameState.PAUSED:
+                self.audio.pause_music()
+                self.audio.play(SoundEvent.PAUSE)
+            case GameState.GAME_OVER:
+                self.audio.stop_music()
+                self.audio.play(SoundEvent.GAME_OVER)
+            case GameState.WIN:
+                self.audio.stop_music()
+                self.audio.play(SoundEvent.WIN)
+            case GameState.MENU:
+                self.audio.stop_music()
+
 
     def handle_events(self):
         """Считывание системных событий"""
@@ -83,6 +114,8 @@ class Game:
     def handle_keydown(self, key):
         """Реакция на нажатие клавиши зависит от состояния игры"""
         match (self.state, key):
+            case(_, pygame.K_m):
+                self.toggle_mute()
             case (GameState.MENU, pygame.K_RETURN):
                 self.state = GameState.PLAYING
             case (GameState.MENU, pygame.K_F9):
@@ -100,6 +133,15 @@ class Game:
             case (GameState.GAME_OVER | GameState.WIN, pygame.K_r):
                 self.start_new_game()
                 self.state = GameState.PLAYING
+
+    def toggle_mute(self):
+        """Включает или выключает звук"""
+        if not self.audio.available:
+            self.show_message("Звук недоступен")
+        elif self.audio.toggle_mute():
+            self.show_message("Звук выключен")
+        else:
+            self.show_message("Звук включён")
 
 
     def spawn_enemy(self):
@@ -130,17 +172,25 @@ class Game:
                         bullet.kill()
                         enemy.hp -= bullet.damage
                         if enemy.hp <= 0:
-                            enemy.kill()
-                            self.player.score += KILL_SCORE
-                            self.enemies_killed += 1
-                            if random.random() < BONUS_DROP_CHANCE:
-                                self.bonuses.add(Bonus(enemy.rect.centerx, enemy.rect.centery))
+                            self.kill_enemy(enemy)
                 case Team.ENEMY if bullet.rect.colliderect(self.player.rect):
                     bullet.kill()
                     if self.player.invulnerable_timer == 0:
                         self.player.hp -= bullet.damage
+                        self.audio.play(SoundEvent.PLAYER_HIT)
                         if bullet.type == BulletType.INCENDIARY:
                             self.player.burn_timer = 90
+
+
+    def kill_enemy(self, enemy, drop_bonus=True):
+        """Уничтожение врага"""
+        enemy.kill()
+        self.player.score += KILL_SCORE
+        self.enemies_killed += 1
+        self.audio.play(SoundEvent.EXPLOSION)
+        if drop_bonus and random.random() < BONUS_DROP_CHANCE:
+            self.bonuses.add(Bonus(enemy.rect.centerx, enemy.rect.centery))
+
 
     def kill_player(self):
         """Обработка смерти игрока"""
@@ -150,6 +200,7 @@ class Game:
         p.stars = max(0, p.stars - 1)
         p.burn_timer = 0
         p.rect.topleft = PLAYER_START_POS
+        self.audio.play(SoundEvent.PLAYER_HIT)
         if p.lives < 0:
             self.state = GameState.GAME_OVER
 
@@ -175,18 +226,57 @@ class Game:
         keys = pygame.key.get_pressed()
 
         self.spawn_enemy()
+        shots = len(self.bullets)
         self.player.update(keys, self.bullets, self.enemies)
-        self.enemies.update(self.player, self.bullets, self.enemies)
+        if len(self.bullets) > shots:
+            self.audio.play(SoundEvent.SHOT)
+        self.update_enemies()
+
+        bullets_before = len(self.bullets)
         self.bullets.update()
+        if len(self.bullets) < bullets_before:
+            self.audio.play(SoundEvent.HIT)
         self.check_bullets()
+        self.check_mines()
 
         for bonus in pygame.sprite.spritecollide(self.player, self.bonuses, True):
             bonus.apply(self.player)
+            self.apply_world_bonus(bonus.type)
+            self.audio.play(SoundEvent.BONUS)
 
         if self.player.hp <= 0:
             self.kill_player()
 
         self.check_win_lose()
+
+    def update_enemies(self):
+        """Враги двигаются и стреляют, если их не заморозили"""
+        if self.freeze_timer > 0:
+            self.freeze_timer -= 1
+            return
+        shots = len(self.bullets)
+        self.enemies.update(self.player, self.bullets, self.enemies)
+        if len(self.bullets) > shots:
+            self.audio.play(SoundEvent.ENEMY_SHOT)
+
+    def check_mines(self):
+        """Звук взрыва мины и гибель врагов, подорвавшихся на мине"""
+        for tank in (self.player, *self.enemies):
+            if tank.mine_hit:
+                tank.mine_hit = False
+                self.audio.play(SoundEvent.MINE)
+        for enemy in list(self.enemies):
+            if enemy.hp <= 0:
+                self.kill_enemy(enemy)
+
+    def apply_world_bonus(self, bonus_type):
+        """Бонусы, которые действуют на всех врагов сразу"""
+        match bonus_type:
+            case BonusType.BOMB:
+                for enemy in list(self.enemies):
+                    self.kill_enemy(enemy, drop_bonus=False)
+            case BonusType.FREEZE:
+                self.freeze_timer = FREEZE_FRAMES
 
     def draw_text_center(self, font, text, color, y):
         """Отрисовка текста с центрированием"""
@@ -248,6 +338,7 @@ class Game:
         """Сохранение прогресса"""
         try:
             savegame.save_to_file(self)
+            self.audio.play(SoundEvent.SAVE)
             self.show_message("Игра сохранена")
         except savegame.SaveError as err:
             self.show_message(str(err))
