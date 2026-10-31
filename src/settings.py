@@ -3,6 +3,7 @@
 идентификаторы типов клеток и балансные параметры геймплея.
 """
 from enum import Enum, IntEnum
+import pygame
 
 
 class GameState(Enum):
@@ -125,8 +126,11 @@ PLAYER_START_POS = (2 * TILE_SIZE, 24 * TILE_SIZE)
 KILL_SCORE = 200
 BONUS_DROP_CHANCE = 0.3
 MINE_DAMAGE = 1.0
-SPEED_BONUS_FRAMES = 600
-FREEZE_FRAMES = 300
+SPEED_BONUS_FRAMES = 300
+FREEZE_FRAMES = 180
+CHEAT_GOD_MODE_FRAMES = 999999
+CHEAT_MAX_LIVES = 999
+CHEAT_FAST_SHOOT_DELAY = 0
 
 BONUS_COLORS = {
     BonusType.SCORE: YELLOW,
@@ -138,3 +142,5 @@ BONUS_COLORS = {
     BonusType.FREEZE: LIGHT_BLUE,
     BonusType.REPAIR: PINK,
 }
+
+SECRET_MENU_SEQUENCE = [pygame.K_UP, pygame.K_UP, pygame.K_DOWN, pygame.K_DOWN]

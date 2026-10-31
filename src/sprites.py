@@ -6,7 +6,7 @@ import pygame
 from src.settings import (
     TILE_SIZE, WIDTH, HEIGHT, BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GREY, BROWN, CYAN,
     ORANGE, PURPLE, MINE_DAMAGE, SPEED_BONUS_FRAMES,
-    BONUS_COLORS, TileType, Team, BulletType, EnemyType, StrategyType, Direction, BonusType
+    BONUS_COLORS, TileType, Team, BulletType, EnemyType, StrategyType, Direction, BonusType,
 )
 
 SCREEN_RECT = pygame.Rect(0, 0, WIDTH, HEIGHT)
@@ -80,13 +80,17 @@ class Block(pygame.sprite.Sprite):
         self.hp = 4.0 if tile_type == TileType.BRICK else 1.0
         self.update_appearance()
 
-    def update_appearance(self):
+    def update_appearance(self, neon_active=False):
         """Создает внешний вид блока"""
         sz = TILE_SIZE
 
+        current_brown = (139, 16, 240) if neon_active else BROWN
+        current_grey = (0, 255, 159) if neon_active else GREY
+        current_blue = (255, 16, 240) if neon_active else BLUE
+
         match self.type:
             case TileType.BRICK:
-                self.image.fill(BROWN)
+                self.image.fill(current_brown)
                 for y in range(0, sz, 6):
                     pygame.draw.line(self.image, BLACK, (0, y), (sz, y), 1)
                     offset = 4 if (y // 6) % 2 == 0 else 0
@@ -94,10 +98,10 @@ class Block(pygame.sprite.Sprite):
                         pygame.draw.line(self.image, BLACK, (x, y), (x, y + 6), 1)
                 pygame.draw.rect(self.image, BLACK, (0, 0, sz, sz), 1)
             case TileType.CONCRETE:
-                self.image.fill(GREY)
+                self.image.fill(current_grey)
                 pygame.draw.rect(self.image, WHITE, (0, 0, sz, sz), 1)
             case TileType.WATER:
-                self.image.fill(BLUE)
+                self.image.fill(current_blue)
                 for y in range(4, sz, 8):
                     pygame.draw.arc(self.image, (100, 150, 255), (2, y, sz // 2, 6), 0, math.pi, 1)
                     pygame.draw.arc(self.image, (100, 150, 255),
@@ -140,7 +144,7 @@ class Block(pygame.sprite.Sprite):
                     case BulletType.WEAK:
                         damage = 0.5
                     case BulletType.SNIPER:
-                        damage = 2.0
+                        damage = 7.0
                     case _:
                         damage = 2.0 if owner_stats >= 3 else 1.0
                 self.hp -= damage
@@ -303,6 +307,10 @@ class PlayerTank(Tank):
         self.score = 0
         self.stars = 0
         self.speed_timer = 0
+        self.is_neon = False
+        self.border_push_timer = 0
+        self.rainbow_frame = 0
+        self.is_rainbow_active = False
 
     def update(self, keys, bullet_group, enemy_group):
         """Поведение танка на карте, движение, стрельба"""
@@ -342,14 +350,38 @@ class PlayerTank(Tank):
 
         if moved:
             self.rect.clamp_ip(SCREEN_RECT)
+            hit_border = False
+            for block in pygame.sprite.spritecollide(self, self.all_blocks, False):
+                if block.type == TileType.BORDER:
+                    hit_border = True
+                    break
+
             self.check_tile_collisions(old_x, old_y, enemy_group)
+
+            if hit_border and self.rect.x == old_x and self.rect.y == old_y:
+                self.border_push_timer += 1
+                if self.border_push_timer >= 300:
+                    self.is_rainbow_active = True
+            else:
+                self.border_push_timer = 0
+        else:
+            self.border_push_timer = 0
 
         self.shoot_delay = 25 if self.stars >= 2 else 40
 
         if keys[pygame.K_SPACE] and self.cooldown == 0:
             self.shoot(bullet_group, self.bullet_type, Team.PLAYER, self.stars)
 
-        self.update_image(GREEN if self.invulnerable_timer == 0 else CYAN)
+        if self.invulnerable_timer > 0:
+            current_color = CYAN
+        elif self.is_rainbow_active:
+            self.rainbow_frame += 1
+            colors_list = [RED, YELLOW, BLUE, CYAN, (255, 0, 255), (0, 255, 0)]
+            current_color = colors_list[(self.rainbow_frame // 5) % len(colors_list)]
+        else:
+            current_color = GREEN
+
+        self.update_image(current_color)
 
 
 class EnemyTank(Tank):

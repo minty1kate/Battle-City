@@ -9,7 +9,8 @@ from src.settings import (
     BonusType, BulletType, SoundEvent, StrategyType, GameState, Team, TileType,
     BLACK, BONUS_DROP_CHANCE, ENEMIES_PER_LEVEL, ENEMY_SPAWN_COLS,
     FPS, GREEN, HEIGHT, KILL_SCORE, MAX_ENEMIES_ON_MAP, PLAYER_START_POS,
-    RED, SPAWN_DELAY, TILE_SIZE, WHITE, WIDTH, YELLOW, FREEZE_FRAMES
+    RED, SPAWN_DELAY, TILE_SIZE, WHITE, WIDTH, YELLOW, FREEZE_FRAMES,
+    SECRET_MENU_SEQUENCE, CHEAT_GOD_MODE_FRAMES, CHEAT_MAX_LIVES, CHEAT_FAST_SHOOT_DELAY
 )
 
 from src.levels import LEVELS
@@ -32,6 +33,8 @@ class Game:
         self.clock = pygame.time.Clock()
         self.font_ui = pygame.font.SysFont("Courier New", 18, bold=True)
         self.font_big = pygame.font.SysFont("Courier New", 44, bold=True)
+        self.is_neon_active = False
+        self.menu_keys_pressed = []
 
         self.all_blocks = pygame.sprite.Group()
         self.bushes = pygame.sprite.Group()
@@ -46,6 +49,13 @@ class Game:
         self.freeze_timer = 0
         self.audio = AudioManager(enabled=sound)
         self.start_new_game()
+
+    def make_neon_color(self, color, activate=False):
+        """Пасхалка"""
+        if not activate:
+            return color
+        r, g, b = color
+        return (r, b, g) if r > 0 else (g, r, 255)
 
     def start_new_game(self):
         """Сброс прогресса и начало новой игры"""
@@ -68,6 +78,8 @@ class Game:
                 if tile == TileType.EMPTY:
                     continue
                 block = Block(col_idx * TILE_SIZE, row_idx * TILE_SIZE, tile)
+                block.update_appearance(neon_active=self.is_neon_active)
+
                 if tile == TileType.BUSH:
                     self.bushes.add(block)
                 else:
@@ -117,9 +129,18 @@ class Game:
             case(_, pygame.K_m):
                 self.toggle_mute()
             case (GameState.MENU, pygame.K_RETURN):
+                self.load_level(0)
                 self.state = GameState.PLAYING
             case (GameState.MENU, pygame.K_F9):
                 self.load_game()
+            case (GameState.MENU, _):
+                self.menu_keys_pressed.append(key)
+                if len(self.menu_keys_pressed) > len(SECRET_MENU_SEQUENCE):
+                    self.menu_keys_pressed.pop(0)
+                if self.menu_keys_pressed == SECRET_MENU_SEQUENCE:
+                    self.is_neon_active = True
+                    self.player.is_neon = True
+                    print("[Пасхалка]: Время неона!")
             case (GameState.PLAYING, pygame.K_p):
                 self.state = GameState.PAUSED
             case (GameState.PAUSED, pygame.K_p):
@@ -128,6 +149,20 @@ class Game:
                 self.save_game()
             case (GameState.PLAYING | GameState.PAUSED, pygame.K_F9):
                 self.load_game()
+            case (GameState.PLAYING, pygame.K_k):
+                for enemy in list(self.enemies):
+                    enemy.hp = 0.0
+                print("[Чит] Все вражеские танки на карте уничтожены!")
+            case (GameState.PLAYING, pygame.K_g):
+                self.player.invulnerable_timer = CHEAT_GOD_MODE_FRAMES
+                print("[Чит] Игрок получил абсолютную неуязвимость!")
+            case (GameState.PLAYING, pygame.K_l):
+                self.player.lives = CHEAT_MAX_LIVES
+                print(f"[Чит] Счетчик жизней установлен на {CHEAT_MAX_LIVES}!")
+            case (GameState.PLAYING, pygame.K_f):
+                self.player.shoot_delay = CHEAT_FAST_SHOOT_DELAY
+                self.player.bullet_type = BulletType.SNIPER
+                print("[Чит] Активирован режим пулемета!")
             case (GameState.PLAYING, _) if key in LEVEL_KEYS:
                 self.load_level(LEVEL_KEYS[key])
             case (GameState.GAME_OVER | GameState.WIN, pygame.K_r):
@@ -287,10 +322,12 @@ class Game:
 
     def draw_menu(self):
         """Отрисовка главного меню"""
-        self.draw_text_center(self.font_big, "BATTLE CITY", YELLOW, HEIGHT // 3)
-        self.draw_text_center(self.font_ui, "Нажмите ENTER для старта", WHITE, HEIGHT // 2 + 40)
+        title_color = self.make_neon_color(YELLOW, self.is_neon_active)
+        text_color = self.make_neon_color(WHITE, self.is_neon_active)
+        self.draw_text_center(self.font_big, "BATTLE CITY", title_color, HEIGHT // 3)
+        self.draw_text_center(self.font_ui, "Нажмите ENTER для старта", text_color, HEIGHT // 2 + 40)
         if savegame.save_exists():
-            self.draw_text_center(self.font_ui, "F9 - продолжить сохранённую игру", WHITE,
+            self.draw_text_center(self.font_ui, "F9 - продолжить сохранённую игру", text_color,
                                   HEIGHT // 2 + 70)
 
     def draw_game(self):
