@@ -48,6 +48,7 @@ class Game:
         self.message_timer = 0
         self.freeze_timer = 0
         self.audio = AudioManager(enabled=sound)
+        self.audio.start_music()
         self.start_new_game()
 
     def make_neon_color(self, color, activate=False):
@@ -140,11 +141,13 @@ class Game:
                 if self.menu_keys_pressed == SECRET_MENU_SEQUENCE:
                     self.is_neon_active = True
                     self.player.is_neon = True
-                    print("[Пасхалка]: Время неона!")
+                    self.show_message("[Пасхалка]: Время неона!")
             case (GameState.PLAYING, pygame.K_p):
                 self.state = GameState.PAUSED
+                self.audio.pause_music()
             case (GameState.PAUSED, pygame.K_p):
                 self.state = GameState.PLAYING
+                self.audio.resume_music()
             case (GameState.PLAYING | GameState.PAUSED, pygame.K_F5):
                 self.save_game()
             case (GameState.PLAYING | GameState.PAUSED, pygame.K_F9):
@@ -152,17 +155,17 @@ class Game:
             case (GameState.PLAYING, pygame.K_k):
                 for enemy in list(self.enemies):
                     enemy.hp = 0.0
-                print("[Чит] Все вражеские танки на карте уничтожены!")
+                self.show_message("[Чит] Все вражеские танки на карте уничтожены!")
             case (GameState.PLAYING, pygame.K_g):
                 self.player.invulnerable_timer = CHEAT_GOD_MODE_FRAMES
-                print("[Чит] Игрок получил абсолютную неуязвимость!")
+                self.show_message("[Чит] Абсолютная неуязвимость!")
             case (GameState.PLAYING, pygame.K_l):
                 self.player.lives = CHEAT_MAX_LIVES
-                print(f"[Чит] Счетчик жизней установлен на {CHEAT_MAX_LIVES}!")
+                self.show_message(f"[Чит] Счетчик жизней установлен на {CHEAT_MAX_LIVES}!")
             case (GameState.PLAYING, pygame.K_f):
                 self.player.shoot_delay = CHEAT_FAST_SHOOT_DELAY
                 self.player.bullet_type = BulletType.SNIPER
-                print("[Чит] Активирован режим пулемета!")
+                self.show_message("[Чит] Активирован режим пулемета!")
             case (GameState.PLAYING, _) if key in LEVEL_KEYS:
                 self.load_level(LEVEL_KEYS[key])
             case (GameState.GAME_OVER | GameState.WIN, pygame.K_r):
