@@ -13,6 +13,7 @@ class GameState(Enum):
     PAUSED = "paused"
     GAME_OVER = "game_over"
     WIN = "win"
+    EDITOR = "editor"
 
 
 class Team(Enum):
@@ -125,7 +126,7 @@ ENEMY_SPAWN_COLS = [2, 12, 22]
 PLAYER_START_POS = (2 * TILE_SIZE, 24 * TILE_SIZE)
 KILL_SCORE = 200
 BONUS_DROP_CHANCE = 0.3
-MINE_DAMAGE = 1.0
+MINE_DAMAGE = 5.0
 SPEED_BONUS_FRAMES = 300
 FREEZE_FRAMES = 180
 CHEAT_GOD_MODE_FRAMES = 999999

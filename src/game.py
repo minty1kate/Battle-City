@@ -4,6 +4,7 @@ import sys
 import pygame
 from src import savegame
 from src.audio import AudioManager, configure_mixer
+from src.editor import LevelEditor
 
 from src.settings import (
     BonusType, BulletType, SoundEvent, StrategyType, GameState, Team, TileType,
@@ -47,6 +48,8 @@ class Game:
         self.message = ""
         self.message_timer = 0
         self.freeze_timer = 0
+        self.editor = LevelEditor(self.screen, self.font_ui)
+        self.custom_level_active = False
         self.audio = AudioManager(enabled=sound)
         self.audio.start_music()
         self.start_new_game()
@@ -63,18 +66,20 @@ class Game:
         self.player = PlayerTank(*PLAYER_START_POS, self.all_blocks)
         self.load_level(0)
 
-    def load_level(self, level_idx):
+    def load_level(self, level_idx, custom_tiles=None):
         """Очищает карту и строит уровень"""
+        self.custom_level_active = custom_tiles is not None
         self.level_idx = level_idx
         self.enemies_killed = 0
         self.spawn_timer = 0
-        self.level_title_timer = 60
+        self.level_title_timer = 0 if custom_tiles is not None else 60
         self.freeze_timer = 0
 
         for group in (self.all_blocks, self.bushes, self.bullets, self.enemies, self.bonuses):
             group.empty()
 
-        for row_idx, row in enumerate(LEVELS[level_idx]):
+        source_tiles = custom_tiles if custom_tiles is not None else LEVELS[level_idx]
+        for row_idx, row in enumerate(source_tiles):
             for col_idx, tile in enumerate(row):
                 if tile == TileType.EMPTY:
                     continue
@@ -123,17 +128,40 @@ class Game:
 
             if event.type == pygame.KEYDOWN:
                 self.handle_keydown(event.key)
+            if self.state == GameState.EDITOR and event.type == pygame.MOUSEBUTTONDOWN:
+                self.editor.handle_click(event.pos, event.button)
+            if self.state == GameState.EDITOR and event.type == pygame.MOUSEMOTION:
+                if event.buttons[0]:
+                    self.editor.handle_click(event.pos, 1)
+                elif event.buttons[2]:
+                    self.editor.handle_click(event.pos, 3)
 
     def handle_keydown(self, key):
         """Реакция на нажатие клавиши зависит от состояния игры"""
+        if self.state == GameState.EDITOR:
+            match self.editor.handle_key(key):
+                case "menu":
+                    self.set_state(GameState.MENU)
+                case "play":
+                    self.play_custom_level()
+                case "saved":
+                    self.show_message("Свой уровень сохранён")
+                case "save_error":
+                    self.show_message("Не удалось сохранить уровень")
+            return
+
         match (self.state, key):
             case(_, pygame.K_m):
                 self.toggle_mute()
             case (GameState.MENU, pygame.K_RETURN):
                 self.load_level(0)
-                self.state = GameState.PLAYING
+                self.set_state(GameState.PLAYING)
             case (GameState.MENU, pygame.K_F9):
                 self.load_game()
+            case (GameState.MENU, pygame.K_e):
+                self.open_editor()
+            case (GameState.MENU, pygame.K_u):
+                self.play_custom_level()
             case (GameState.MENU, _):
                 self.menu_keys_pressed.append(key)
                 if len(self.menu_keys_pressed) > len(SECRET_MENU_SEQUENCE):
@@ -143,10 +171,10 @@ class Game:
                     self.player.is_neon = True
                     self.show_message("[Пасхалка]: Время неона!")
             case (GameState.PLAYING, pygame.K_p):
-                self.state = GameState.PAUSED
+                self.set_state(GameState.PAUSED)
                 self.audio.pause_music()
             case (GameState.PAUSED, pygame.K_p):
-                self.state = GameState.PLAYING
+                self.set_state(GameState.PLAYING)
                 self.audio.resume_music()
             case (GameState.PLAYING | GameState.PAUSED, pygame.K_F5):
                 self.save_game()
@@ -169,8 +197,27 @@ class Game:
             case (GameState.PLAYING, _) if key in LEVEL_KEYS:
                 self.load_level(LEVEL_KEYS[key])
             case (GameState.GAME_OVER | GameState.WIN, pygame.K_r):
-                self.start_new_game()
-                self.state = GameState.PLAYING
+                if self.custom_level_active:
+                    self.play_custom_level()
+                else:
+                    self.start_new_game()
+                    self.set_state(GameState.PLAYING)
+
+    def open_editor(self):
+        """Открывает класс редактора пользовательской карты"""
+        self.editor.open()
+        self.set_state(GameState.EDITOR)
+
+    def play_custom_level(self):
+        """Запускает сохранённую пользовательскую карту"""
+        try:
+            tiles = self.editor.load_saved_level()
+        except (OSError, ValueError, TypeError, KeyError):
+            self.show_message("Сохранённый уровень не найден")
+            return
+        self.player = PlayerTank(*PLAYER_START_POS, self.all_blocks)
+        self.load_level(0, custom_tiles=tiles)
+        self.set_state(GameState.PLAYING)
 
     def toggle_mute(self):
         """Включает или выключает звук"""
@@ -250,7 +297,9 @@ class Game:
         if not base_alive:
             self.state = GameState.GAME_OVER
         elif self.enemies_killed >= ENEMIES_PER_LEVEL and len(self.enemies) == 0:
-            if self.level_idx + 1 < len(LEVELS):
+            if self.custom_level_active:
+                self.set_state(GameState.WIN)
+            elif self.level_idx + 1 < len(LEVELS):
                 self.load_level(self.level_idx + 1)
             else:
                 self.state = GameState.WIN
@@ -332,6 +381,11 @@ class Game:
         if savegame.save_exists():
             self.draw_text_center(self.font_ui, "F9 - продолжить сохранённую игру", text_color,
                                   HEIGHT // 2 + 70)
+        self.draw_text_center(self.font_ui, "E - создать свой уровень", text_color,
+                              HEIGHT // 2 + 100)
+        if self.editor.has_saved_level:
+            self.draw_text_center(self.font_ui, "U - запустить свой уровень", GREEN,
+                                  HEIGHT // 2 + 130)
 
     def draw_game(self):
         """Отрисовка игровых объектов"""
@@ -396,6 +450,8 @@ class Game:
         self.screen.fill(BLACK)
         if self.state == GameState.MENU:
             self.draw_menu()
+        elif self.state == GameState.EDITOR:
+            self.editor.draw(neon_active=self.is_neon_active)
         else:
             self.draw_game()
         if self.message_timer > 0:
