@@ -13,20 +13,22 @@ MIXER_CHANNELS = 1
 MIXER_BUFFER = 512
 MAX_AMPLITUDE = 32767
 SFX_VOLUME = 0.6
-MUSIC_VOLUME = 0.35
+MUSIC_VOLUME = 0.2
 NOTE_STEP = 0.25
+LEAD_VOLUME = 0.35
+BASS_VOLUME = 0.3
 
 CHORDS = ((57, 60, 64), (53, 57, 60), (48, 52, 55), (55, 59, 62))
 ARPEGGIO = (0, 1, 2, 1, 2, 1, 0, 1)
 
 
 def midi_to_freq(note):
-    """Частота ноты MIDI в герцах (69 = ля первой октавы = 440 Гц)"""
+    """Частота ноты MIDI в герцах"""
     return 440.0 * 2 ** ((note - 69) / 12)
 
 
 def square(phase):
-    """Прямоугольная волна (фаза в периодах)"""
+    """Прямоугольная волна"""
     return 1.0 if phase % 1.0 < 0.5 else -1.0
 
 
@@ -46,7 +48,7 @@ def sine(phase):
 
 
 def tone(rate, duration, freq_start, freq_end=None, shape=square, volume=0.5, decay=True):
-    """Один тон: частота плавно меняется от freq_start до freq_end, громкость затухает"""
+    """Один тон"""
     freq_end = freq_start if freq_end is None else freq_end
     count = int(rate * duration)
     samples = []
@@ -60,14 +62,14 @@ def tone(rate, duration, freq_start, freq_end=None, shape=square, volume=0.5, de
 
 
 def noise_burst(rate, duration, volume=0.5, seed=1):
-    """Шум, быстро затихающий (выстрелы, взрывы)"""
+    """Шум, быстро затихающий"""
     rng = random.Random(seed)
     count = int(rate * duration)
     return [rng.uniform(-1.0, 1.0) * volume * (1.0 - i / count) ** 2 for i in range(count)]
 
 
 def melody(rate, notes, note_length, shape=square, volume=0.4):
-    """Последовательность нот MIDI, одна за другой"""
+    """Последовательность нот MIDI"""
     samples = []
     for note in notes:
         samples += tone(rate, note_length, midi_to_freq(note), shape=shape, volume=volume)
@@ -75,7 +77,7 @@ def melody(rate, notes, note_length, shape=square, volume=0.4):
 
 
 def mix(*tracks):
-    """Складывает дорожки (короткие дополняются тишиной)"""
+    """Складывает дорожки"""
     length = max(len(track) for track in tracks)
     result = [0.0] * length
     for track in tracks:
@@ -94,7 +96,7 @@ def to_pcm(samples, channels):
 
 
 def build_effects(rate):
-    """Дорожки всех звуковых эффектов: словарь {событие: список отсчётов}"""
+    """Дорожки всех звуковых эффектов"""
     return {
         SoundEvent.SHOT: tone(rate, 0.12, 900, 300, square, 0.35),
         SoundEvent.ENEMY_SHOT: tone(rate, 0.10, 500, 200, square, 0.2),
@@ -117,27 +119,27 @@ def build_music(rate):
     lead, bass = [], []
     for chord in CHORDS:
         for index in ARPEGGIO:
-            lead += tone(rate, NOTE_STEP, midi_to_freq(chord[index] + 12), volume=0.18)
+            lead += tone(rate, NOTE_STEP, midi_to_freq(chord[index] + 12), volume=LEAD_VOLUME)
         for _ in range(4):
             bass += tone(rate, NOTE_STEP * 2, midi_to_freq(chord[0] - 12), shape=triangle,
-                         volume=0.3)
+                         volume=BASS_VOLUME)
     return mix(lead, bass)
 
 
 @lru_cache(maxsize=None)
 def build_buffers(rate, channels):
-    """Готовые байты всех звуков и музыки. Считаются один раз и запоминаются"""
+    """Готовые байты всех звуков и музыки"""
     effects = {event: to_pcm(track, channels) for event, track in build_effects(rate).items()}
     return effects, to_pcm(build_music(rate), channels)
 
 
 def configure_mixer():
-    """Задаёт параметры звука. Нужно вызвать до pygame.init()"""
+    """Задаёт параметры звука"""
     pygame.mixer.pre_init(SAMPLE_RATE, SAMPLE_FORMAT, MIXER_CHANNELS, MIXER_BUFFER)
 
 
 class AudioManager:
-    """Проигрывает звуки и музыку. Без звукового устройства все методы ничего не делают"""
+    """Проигрывает звуки и музыку"""
 
     def __init__(self, enabled=True):
         self.available = False
@@ -149,7 +151,7 @@ class AudioManager:
             self.available = self._init_mixer()
 
     def _init_mixer(self):
-        """Готовит звуки. Возвращает False, если звук запустить не удалось"""
+        """Готовит звуки"""
         try:
             if pygame.mixer.get_init() is None:
                 pygame.mixer.init()
@@ -174,7 +176,7 @@ class AudioManager:
             self.sounds[event].play()
 
     def start_music(self):
-        """Запускает музыку с начала (зацикленно)"""
+        """Запускает музыку с начала"""
         if not self.available:
             return
         self.stop_music()
@@ -198,7 +200,7 @@ class AudioManager:
         self.music_channel = None
 
     def toggle_mute(self):
-        """Включает или выключает весь звук. Возвращает True, если звук теперь выключен"""
+        """Включает или выключает весь звук"""
         self.muted = not self.muted
         self._apply_music_volume()
         return self.muted
