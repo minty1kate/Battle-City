@@ -7,7 +7,8 @@ from src.game import Game
 from src.levels import LEVELS
 from src.settings import (
     PLAYER_START_POS, SPAWN_DELAY, MAX_ENEMIES_ON_MAP, ENEMIES_PER_LEVEL,
-    KILL_SCORE, TileType, GameState, Team, BulletType, StrategyType, EnemyType
+    KILL_SCORE, TileType, GameState, Team, BulletType, StrategyType, EnemyType,
+    Direction, BonusType, FREEZE_FRAMES
 )
 from src.sprites import Block, Bonus, Bullet, EnemyTank
 
@@ -19,7 +20,7 @@ def add_enemy(game, kind=EnemyType.SIMPLE, x=240, y=240):
 
 
 def add_bullet(game, target, owner, bullet_type=BulletType.NORMAL):
-    bullet = Bullet(target.rect.centerx, target.rect.centery, "UP", bullet_type, owner,
+    bullet = Bullet(target.rect.centerx, target.rect.centery, Direction.UP, bullet_type, owner,
                     game.all_blocks)
     game.bullets.add(bullet)
     return bullet
@@ -228,7 +229,7 @@ def test_game_over_when_lives_run_out(bare_game):
 def test_bonus_is_picked_up(bare_game):
     p = bare_game.player
     bonus = Bonus(p.rect.centerx, p.rect.centery)
-    bonus.type = "life"
+    bonus.type = BonusType.LIFE
     bare_game.bonuses.add(bonus)
     bare_game.update()
     assert p.lives == 4
@@ -239,7 +240,7 @@ def test_destroyed_blocks_disappear(bare_game):
     brick = Block(240, 240, TileType.BRICK)
     brick.hp = 1.0
     bare_game.all_blocks.add(brick)
-    bare_game.bullets.add(Bullet(250, 260, "UP", BulletType.NORMAL, Team.PLAYER, bare_game.all_blocks))
+    bare_game.bullets.add(Bullet(250, 260, Direction.UP, BulletType.NORMAL, Team.PLAYER, bare_game.all_blocks))
     bare_game.update()
     assert brick not in bare_game.all_blocks
 
@@ -289,3 +290,84 @@ def test_update_does_nothing_while_title_is_shown(game):
     assert game.spawn_timer == 0
     game.update()
     assert game.spawn_timer == 1
+
+
+def test_show_message(game):
+    game.show_message("Тест")
+    assert game.message == "Тест"
+    assert game.message_timer > 0
+
+
+def test_save_game_success(game, monkeypatch):
+    monkeypatch.setattr("src.game.savegame.save_to_file", lambda g: None)
+
+    game.save_game()
+
+    assert game.message == "Игра сохранена"
+
+
+def test_save_game_error(game, monkeypatch):
+    from src.savegame import SaveError
+
+    def raise_error(g):
+        raise SaveError("Ошибка сохранения")
+
+    monkeypatch.setattr("src.game.savegame.save_to_file", raise_error)
+
+    game.save_game()
+
+    assert game.message == "Ошибка сохранения"
+
+
+def test_load_game_success(game, monkeypatch):
+    monkeypatch.setattr("src.game.savegame.load_from_file", lambda g: None)
+
+    game.load_game()
+
+    assert game.message == "Игра загружена"
+
+
+def test_load_game_error(game, monkeypatch):
+    from src.savegame import SaveError
+
+    def raise_error(g):
+        raise SaveError("Ошибка загрузки")
+
+    monkeypatch.setattr("src.game.savegame.load_from_file", raise_error)
+
+    game.load_game()
+
+    assert game.message == "Ошибка загрузки"
+
+
+def test_update_level_timer(game, monkeypatch):
+    game.level_title_timer = 2
+
+    monkeypatch.setattr(game, "spawn_enemy", lambda: pytest.fail("Не должен вызываться"))
+
+    game.update()
+
+    assert game.level_title_timer == 1
+
+
+def test_update_enemies_freeze(game):
+    game.freeze_timer = 2
+
+    game.update_enemies()
+
+    assert game.freeze_timer == 1
+
+
+def test_check_mines(game):
+    game.player.mine_hit = True
+    game.audio.play = lambda sound: None
+
+    game.check_mines()
+
+    assert game.player.mine_hit is False
+
+
+def test_apply_world_bonus_freeze(game):
+    game.apply_world_bonus(BonusType.FREEZE)
+
+    assert game.freeze_timer == FREEZE_FRAMES

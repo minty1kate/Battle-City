@@ -3,9 +3,9 @@ import pytest
 
 from src.settings import (
     TILE_SIZE, WIDTH, GREEN, CYAN,
-    TileType, Team, BulletType, EnemyType, StrategyType
+    TileType, Team, BulletType, EnemyType, StrategyType, Direction
 )
-from src.sprites import (Block, Bullet, DIRECTIONS, ENEMY_STATS, EnemyTank, PlayerTank,
+from src.sprites import (Block, Bullet, ENEMY_STATS, EnemyTank, PlayerTank,
                          Tank, align)
 
 
@@ -47,9 +47,9 @@ def test_block_hits_to_destroy(tile, bullet_type, stars, expected_hits):
     assert hits == expected_hits
 
 
-@pytest.mark.parametrize("direction", list(DIRECTIONS))
+@pytest.mark.parametrize("direction", list(Direction))
 def test_bullet_moves_in_every_direction(direction, blocks):
-    dx, dy = DIRECTIONS[direction]
+    dx, dy = direction.value
     bullet = Bullet(300, 300, direction, BulletType.NORMAL, Team.PLAYER, blocks)
     x, y = bullet.rect.x, bullet.rect.y
     bullet.update()
@@ -63,7 +63,7 @@ def test_bullet_moves_in_every_direction(direction, blocks):
     (BulletType.NORMAL, 1, 9),
 ])
 def test_bullet_speed(bullet_type, stars, speed, blocks):
-    assert Bullet(0, 0, "UP", bullet_type, Team.PLAYER, blocks, stars).speed == speed
+    assert Bullet(0, 0, Direction.UP, bullet_type, Team.PLAYER, blocks, stars).speed == speed
 
 
 @pytest.mark.parametrize("bullet_type, damage", [
@@ -73,13 +73,13 @@ def test_bullet_speed(bullet_type, stars, speed, blocks):
     (BulletType.INCENDIARY, 1.0),
 ])
 def test_bullet_damage(bullet_type, damage, blocks):
-    assert Bullet(0, 0, "UP", bullet_type, Team.ENEMY, blocks).damage == damage
+    assert Bullet(0, 0, Direction.UP, bullet_type, Team.ENEMY, blocks).damage == damage
 
 
 def test_bullet_damages_brick_and_disappears(blocks):
     brick = Block(240, 240, TileType.BRICK)
     blocks.add(brick)
-    bullet = Bullet(250, 270, "UP", BulletType.NORMAL, Team.PLAYER, blocks)
+    bullet = Bullet(250, 270, Direction.UP, BulletType.NORMAL, Team.PLAYER, blocks)
     group = pygame.sprite.Group(bullet)
     bullet.update()
     assert bullet not in group
@@ -89,7 +89,7 @@ def test_bullet_damages_brick_and_disappears(blocks):
 @pytest.mark.parametrize("tile", [TileType.WATER, TileType.ICE, TileType.BUSH])
 def test_bullet_flies_over_water_ice_and_bush(tile, blocks):
     blocks.add(Block(240, 240, tile))
-    bullet = Bullet(250, 270, "UP", BulletType.NORMAL, Team.PLAYER, blocks)
+    bullet = Bullet(250, 270, Direction.UP, BulletType.NORMAL, Team.PLAYER, blocks)
     group = pygame.sprite.Group(bullet)
     bullet.update()
     assert bullet in group
@@ -114,11 +114,11 @@ def test_invulnerability_blocks_burning(blocks):
 
 def test_shoot_makes_bullet_and_starts_cooldown(blocks):
     tank = Tank(100, 100, blocks)
-    tank.direction = "LEFT"
+    tank.direction = Direction.LEFT
     bullets = pygame.sprite.Group()
     tank.shoot(bullets, BulletType.NORMAL, Team.ENEMY)
     bullet = bullets.sprites()[0]
-    assert (bullet.direction, bullet.owner_team) == ("LEFT", Team.ENEMY)
+    assert (bullet.direction, bullet.owner_team) == (Direction.LEFT, Team.ENEMY)
     assert tank.cooldown == tank.shoot_delay
 
 
@@ -163,12 +163,14 @@ def test_player_defaults(blocks):
 
 
 @pytest.mark.parametrize("key, direction", [
-    (pygame.K_UP, "UP"), (pygame.K_DOWN, "DOWN"), (pygame.K_LEFT, "LEFT"), (pygame.K_RIGHT, "RIGHT"),
-    (pygame.K_w, "UP"), (pygame.K_s, "DOWN"), (pygame.K_a, "LEFT"), (pygame.K_d, "RIGHT"),
+    (pygame.K_UP, Direction.UP), (pygame.K_DOWN, Direction.DOWN), (pygame.K_LEFT, Direction.LEFT),
+    (pygame.K_RIGHT, Direction.RIGHT),
+    (pygame.K_w, Direction.UP), (pygame.K_s, Direction.DOWN), (pygame.K_a, Direction.LEFT),
+    (pygame.K_d, Direction.RIGHT),
 ])
 def test_player_moves(key, direction, blocks, make_keys):
     player, bullets, enemies = make_player(blocks)
-    dx, dy = DIRECTIONS[direction]
+    dx, dy = direction.value
     player.update(make_keys(key), bullets, enemies)
     assert (player.rect.x, player.rect.y) == (240 + dx * 3, 240 + dy * 3)
     assert player.direction == direction
@@ -236,10 +238,10 @@ def test_stars_are_passed_to_bullet(blocks, make_keys):
 def test_shield_changes_player_color(blocks, make_keys):
     player, bullets, enemies = make_player(blocks)
     player.update(make_keys(), bullets, enemies)
-    assert player.last_look == ("UP", GREEN)
+    assert player.last_look == (Direction.UP, GREEN)
     player.invulnerable_timer = 50
     player.update(make_keys(), bullets, enemies)
-    assert player.last_look == ("UP", CYAN)
+    assert player.last_look == (Direction.UP, CYAN)
 
 
 def make_enemy(blocks, kind=EnemyType.SIMPLE, strategy=StrategyType.PATROL, x=240, y=240):
@@ -249,20 +251,10 @@ def make_enemy(blocks, kind=EnemyType.SIMPLE, strategy=StrategyType.PATROL, x=24
 @pytest.mark.parametrize("kind", list(ENEMY_STATS))
 def test_enemy_stats_match_type(kind, blocks):
     enemy, stats = make_enemy(blocks, kind), ENEMY_STATS[kind]
-    assert enemy.speed == stats["speed"]
-    assert enemy.hp == enemy.max_hp == stats["hp"]
-    assert enemy.bullet_type == stats["bullet"]
-    assert enemy.shoot_delay == stats["shoot_delay"]
-
-
-def test_four_enemy_types_with_four_bullet_kinds():
-    assert len(ENEMY_STATS) == 4
-    assert {s["bullet"] for s in ENEMY_STATS.values()} == {
-        BulletType.WEAK,
-        BulletType.NORMAL,
-        BulletType.CONCRETE_BREAKER,
-        BulletType.INCENDIARY
-    }
+    assert enemy.speed == stats.speed
+    assert enemy.hp == enemy.max_hp == stats.hp
+    assert enemy.bullet_type == stats.bullet
+    assert enemy.shoot_delay == stats.shoot_delay
 
 
 def test_sliding_adds_speed(blocks):

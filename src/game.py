@@ -26,6 +26,7 @@ MESSAGE_FRAMES = 120
 
 class Game:
     """Класс, реализующий игровой движок"""
+
     def __init__(self, sound=True):
         configure_mixer()
         pygame.init()
@@ -95,7 +96,6 @@ class Game:
         if self.state == GameState.PLAYING:
             self.audio.play(SoundEvent.LEVEL_START)
 
-
     def set_state(self, state):
         """Меняет состояние игры и включает, ставит на паузу или останавливает музыку"""
         previous = self.state
@@ -117,7 +117,6 @@ class Game:
                 self.audio.play(SoundEvent.WIN)
             case GameState.MENU:
                 self.audio.stop_music()
-
 
     def handle_events(self):
         """Считывание системных событий"""
@@ -151,7 +150,7 @@ class Game:
             return
 
         match (self.state, key):
-            case(_, pygame.K_m):
+            case (_, pygame.K_m):
                 self.toggle_mute()
             case (GameState.MENU, pygame.K_RETURN):
                 self.load_level(0)
@@ -228,7 +227,6 @@ class Game:
         else:
             self.show_message("Звук включён")
 
-
     def spawn_enemy(self):
         """Создаёт врага, если на карте есть место"""
         self.spawn_timer += 1
@@ -266,7 +264,6 @@ class Game:
                         if bullet.type == BulletType.INCENDIARY:
                             self.player.burn_timer = 90
 
-
     def kill_enemy(self, enemy, drop_bonus=True):
         """Уничтожение врага"""
         enemy.kill()
@@ -275,7 +272,6 @@ class Game:
         self.audio.play(SoundEvent.EXPLOSION)
         if drop_bonus and random.random() < BONUS_DROP_CHANCE:
             self.bonuses.add(Bonus(enemy.rect.centerx, enemy.rect.centery))
-
 
     def kill_player(self):
         """Обработка смерти игрока"""
@@ -426,7 +422,6 @@ class Game:
         """Сообщение внизу экрана"""
         self.message = text
         self.message_timer = MESSAGE_FRAMES
-
 
     def save_game(self):
         """Сохранение прогресса"""

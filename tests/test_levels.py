@@ -1,6 +1,6 @@
 ﻿from src.levels import LEVELS
 from src.settings import (
-    PLAYER_START_POS,  TILE_SIZE, TileType, GRID_SIZE
+    PLAYER_START_POS, TILE_SIZE, TileType, GRID_SIZE
 )
 
 
@@ -18,7 +18,7 @@ def test_matrix_size():
 def test_only_known_tiles():
     for matrix in LEVELS:
         for row in matrix:
-            assert all(TileType.EMPTY <= tile <= TileType.BORDER for tile in row)
+            assert all(TileType.EMPTY <= tile <= TileType.MINE for tile in row)
 
 
 def test_border_is_closed():
