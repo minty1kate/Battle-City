@@ -8,6 +8,7 @@ from src.settings import (
 )
 from src.sprites import Block
 
+
 class LevelEditor:
     """Простой редактор уровней"""
     TILES = (
@@ -52,7 +53,7 @@ class LevelEditor:
         if key == pygame.K_RETURN:
             return "play" if self.save() else "save_error"
         if pygame.K_1 <= key <= pygame.K_7:
-                self.selected = self.TILES[key - pygame.K_1]
+            self.selected = self.TILES[key - pygame.K_1]
         return None
 
     def handle_click(self, position, button):

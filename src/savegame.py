@@ -16,6 +16,7 @@ SAVE_PATH = Path(__file__).resolve().parent.parent / "save.json"
 class SaveError(Exception):
     """Ошибка сохранения или загрузки"""
 
+
 def snapshot(game):
     """Собирает состояние игры в словарь"""
     player = game.player

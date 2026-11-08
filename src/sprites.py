@@ -72,6 +72,7 @@ def align(value):
 
 class Block(pygame.sprite.Sprite):
     """Класс блоков"""
+
     def __init__(self, x, y, tile_type):
         super().__init__()
         self.type = tile_type
@@ -159,6 +160,7 @@ class Block(pygame.sprite.Sprite):
 
 class Bullet(pygame.sprite.Sprite):
     """Класс пуль"""
+
     def __init__(self, x, y, direction, bullet_type, owner_team, all_blocks, owner_stats=0):
         super().__init__()
         self.direction = direction
@@ -194,6 +196,7 @@ class Bullet(pygame.sprite.Sprite):
 
 class Tank(pygame.sprite.Sprite):
     """Класс танков"""
+
     def __init__(self, x, y, all_blocks):
         super().__init__()
         self.all_blocks = all_blocks
@@ -297,6 +300,7 @@ class Tank(pygame.sprite.Sprite):
 
 class PlayerTank(Tank):
     """Класс танка игрока"""
+
     def __init__(self, x, y, all_blocks):
         super().__init__(x, y, all_blocks)
         self.hp = 3.0
@@ -386,6 +390,7 @@ class PlayerTank(Tank):
 
 class EnemyTank(Tank):
     """Вражеские танки со стратегией"""
+
     def __init__(self, x, y, all_blocks, enemy_type, strategy_type):
         super().__init__(x, y, all_blocks)
         self.enemy_type = enemy_type
@@ -484,6 +489,7 @@ class EnemyTank(Tank):
 
 class Bonus(pygame.sprite.Sprite):
     """Класс бонусов"""
+
     def __init__(self, x, y):
         super().__init__()
         self.type = random.choice(list(BONUS_COLORS))

@@ -6,6 +6,10 @@ import src.game as game_module
 
 class FakeGame:
     started = False
+    sound_enabled = None
+
+    def __init__(self, sound=True):
+        self.sound_enabled = sound
 
     def run(self):
         FakeGame.started = True
@@ -13,8 +17,12 @@ class FakeGame:
 
 def make_failing_game(error):
     class FailingGame:
+        def __init__(self, sound=True):
+            self.sound = sound
+
         def run(self):
             raise error
+
     return FailingGame
 
 
@@ -48,24 +56,25 @@ def test_main_runs_game(monkeypatch):
 
 
 def test_unexpected_error_hides_traceback(monkeypatch, capsys):
-    old_game_class = game_module.Game
-    game_module.Game = make_failing_game(RuntimeError("boom"))
+    monkeypatch.setattr(game_module, "Game", make_failing_game(RuntimeError("boom")))
+    assert main.main([]) == 1
 
-    try:
-        assert main.main([]) == 1
-        err = capsys.readouterr().err
-        assert "Ошибка: boom" in err
-        assert "Traceback" not in err
-    finally:
-        game_module.Game = old_game_class
+    err = capsys.readouterr().err
+    assert "Ошибка: boom" in err
+    assert "Traceback" not in err
 
 
 def test_debug_mode_shows_traceback(monkeypatch):
-    old_game_class = game_module.Game
-    game_module.Game = make_failing_game(RuntimeError("boom"))
+    monkeypatch.setattr(game_module, "Game", make_failing_game(RuntimeError("boom")))
+    with pytest.raises(RuntimeError, match="boom"):
+        main.main(["--debug"])
 
-    try:
-        with pytest.raises(RuntimeError):
-            main.main(["--debug"])
-    finally:
-        game_module.Game = old_game_class
+
+def test_passes_disabled_sound(monkeypatch):
+    FakeGame.started = False
+    FakeGame.sound_enabled = None
+    monkeypatch.setattr("src.game.Game", FakeGame)
+
+    assert main.main(["--no-sound"]) == 0
+    assert FakeGame.started is True
+    assert FakeGame.sound_enabled is None

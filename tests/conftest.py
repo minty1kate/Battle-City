@@ -4,7 +4,6 @@ import os
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-
 import pygame
 import pytest
 
@@ -14,23 +13,29 @@ from src.settings import TileType, GameState
 
 class FakeKeys:
     """Замена pygame.key.get_pressed()"""
+
     def __init__(self, pressed=()):
         self.pressed = set(pressed)
 
     def __getitem__(self, key):
         return key in self.pressed
 
+
 class FakeEvent:
     """Имитация событий клавиатуры"""
+
     def __init__(self, event_type, key):
         self.type = event_type
         self.key = key
 
+
 @pytest.fixture
 def make_keys():
     """Создаёт набор нажатых клавиш"""
+
     def _make(*pressed):
         return FakeKeys(pressed)
+
     return _make
 
 
@@ -43,8 +48,10 @@ def blocks():
 @pytest.fixture
 def keydown():
     """Создаёт событие нажатия клавиши"""
+
     def _keydown(key):
         return FakeEvent(pygame.KEYDOWN, key)
+
     return _keydown
 
 
