@@ -115,7 +115,7 @@ def build_effects(rate):
 
 
 def build_music(rate):
-    """Фоновая мелодия на 8 секунд (зацикливается): арпеджио и бас на четырёх аккордах"""
+    """Фоновая мелодия на 8 секунд"""
     lead, bass = [], []
     for chord in CHORDS:
         for index in ARPEGGIO:
@@ -140,7 +140,6 @@ def configure_mixer():
 
 class AudioManager:
     """Проигрывает звуки и музыку"""
-
     def __init__(self, enabled=True):
         self.available = False
         self.muted = False

@@ -3,7 +3,7 @@ from pathlib import Path
 import pygame
 from src.levels import get_empty_matrix, add_base, add_border
 from src.settings import (
-    BLACK, ENEMY_SPAWN_COLS, GREEN, HEIGHT, TILE_SIZE, WHITE, WIDTH, YELLOW,
+    BLACK, ENEMY_SPAWN_COLS, TILE_SIZE, WHITE, WIDTH, YELLOW,
     TileType,
 )
 from src.sprites import Block
